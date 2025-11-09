@@ -1,0 +1,6 @@
+pytelegrambotapi
+djangorestframework
+python-decouple
+psycopg2-binary
+telebot-calendar
+
