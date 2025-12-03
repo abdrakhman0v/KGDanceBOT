@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-# print("✅ Start manage.py")
 
 from pathlib import Path
 
@@ -28,11 +27,7 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "lena-nonmetalliferous-pura.ngrok-free.dev"
-]
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -149,4 +144,7 @@ REST_FRAMEWORK = {
 }
 
 TG_TOKEN = config('TG_TOKEN')
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 

@@ -8,16 +8,12 @@ from bot.groups import CreateGroup, ListGroup, DetailGroup, DetailGroupUser, Upd
 from bot.subscriptions import SubscriptionHandler
 from .utils import show_menu
 
-
 TOKEN = config('TG_TOKEN')
 bot = telebot.TeleBot(TOKEN)
 API_URL = 'http://127.0.0.1:8000/'
 WEBHOOK_URL = 'https://lena-nonmetalliferous-pura.ngrok-free.dev/webhook/'
 
-
 requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}",)
-
-
 
 register_handler = Register(bot)
 @bot.message_handler(commands=['start'])
@@ -232,54 +228,6 @@ delete_group_handler = DeleteGroup(bot)
 def start_delete(call):
     delete_group_handler.delete(call)
 
-# --АБОНЕМЕНТЫ--
-
-# @bot.callback_query_handler(func=lambda call:call.data == 'subscriptions')
-# def abonements(call):
-#     markup = types.InlineKeyboardMarkup()
-#     markup.add(types.InlineKeyboardButton('+ Создать', callback_data='create_subscription'))
-#     markup.add(types.InlineKeyboardButton('⬅️Назад', callback_data='admin_panel'))
-
-#     bot.edit_message_text(
-#         '<b>Абонементы</b>',
-#         chat_id=call.message.chat.id,
-#         message_id=call.message.message_id,
-#         reply_markup=markup,
-#         parse_mode='HTML'
-#     )
-
-
-# create_sub_handler = CreateSubscription(bot)
-# @bot.callback_query_handler(func=lambda call:call.data == 'create_subscription')
-# def start_create(call):
-#     create_sub_handler.find_user(call)
-    
-
-# @bot.callback_query_handler(func=lambda call:call.data == 'confirm_create_sub')
-# def choose_day(call):
-#     markup = types.InlineKeyboardMarkup()
-#     markup.add(types.InlineKeyboardButton('Пн/Ср/Пт', callback_data='m_w_f'))
-#     markup.add(types.InlineKeyboardButton('Вт/Чт/Сб', callback_data='t_t_s'))
-#     markup.add(types.InlineKeyboardButton('Сб/Вс', callback_data='s_s'))
-#     markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_sub'))
-
-#     bot.edit_message_text(
-#         text = 'Выберите дни: ',
-#         chat_id=call.message.chat.id,
-#         message_id=call.message.message_id,
-#         reply_markup=markup,
-#     )
-
-# @bot.callback_query_handler(func=lambda call:call.data in ['m_w_f', 't_t_s', 's_s'])
-# def groups(call):
-#     if call.data == 'm_w_f':
-#         create_sub_handler.groups_list_mon(call)
-
-#     elif call.data == 't_t_s':
-#         create_sub_handler.groups_list_tue(call)
-
-#     elif call.data == 's_s':
-#         create_sub_handler.groups_list_sun(call)
 
 sub_handler = SubscriptionHandler(bot)
 

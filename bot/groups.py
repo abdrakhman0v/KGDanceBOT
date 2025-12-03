@@ -356,7 +356,6 @@ class DetailGroup:
 
 # to-do добавить удаления кнопок после добавления
     def add_client(self, call):
-        print(0)
         chat_id = call.message.chat.id
         telegram_id = call.from_user.id
         data = {
@@ -385,8 +384,6 @@ class DetailGroup:
         finally:
             self.user_to_add.pop(chat_id, None)
 
-
-# to-do создать фичу отметки абонементов
 
 class DetailGroupUser:
     
@@ -534,7 +531,6 @@ class DetailGroupUser:
 
         response = requests.patch(f"http://127.0.0.1:8000/subscription/mark_attendance/{sub_id}/", json=data, headers={'X-Telegram-Id':str(call.from_user.id)})
         sub_data = response.json()
-        print(sub_data)
         if len(sub_data['attendance']) == sub_data['total_lessons']:
             self.bot.answer_callback_query(call.id, 'Абонемент закончился.', show_alert=True)
 

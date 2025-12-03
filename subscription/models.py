@@ -24,8 +24,6 @@ class Subscription(models.Model):
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} | {self.group}"
     
-    def check_and_delete(self):
-        if len(self.attendance) == self.total_lessons:
-            self.delete()
+    
 
 

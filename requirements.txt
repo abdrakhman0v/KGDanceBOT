@@ -3,4 +3,6 @@ djangorestframework
 python-decouple
 psycopg2-binary
 telebot-calendar
+celery
+redis
 

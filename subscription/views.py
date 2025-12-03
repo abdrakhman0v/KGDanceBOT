@@ -11,6 +11,7 @@ from account.permissions import IsAdmin
 
 from .models import Subscription
 from .serializers import SubscriptionSerializer
+from .tasks import check_subscription_expiry
 
     
 class CreateSubView(APIView):
@@ -41,21 +42,29 @@ class GetChildSubView(APIView):
         serializer = SubscriptionSerializer(subscriptions, many=True)
         return Response(serializer.data, status=200)
     
-@api_view(['PATCH'])
-@authentication_classes([TelegramAuthentication])
-def mark_attendance(request, subscription_id):
-    sub = Subscription.objects.get(id=subscription_id)
-    date = request.data.get('date')
-    status = request.data.get('status')
 
-    attendance = sub.attendance or {}
-    attendance[date] = bool(status)
-    sub.attendance = attendance
+class MarkAttendance(APIView):
+    authentication_classes = [TelegramAuthentication]
 
-    sub.used_lessons = sum(1 for s in attendance.values() if s)
-    sub.save()
-    sub.check_and_delete()
-    return Response({'message': 'Attendance updated', 'attendance': sub.attendance, 'total_lessons':sub.total_lessons})
+    def patch(self, request, subscription_id):
+        sub = Subscription.objects.get(id=subscription_id)
+        date = request.data.get('date')
+        status = request.data.get('status')
+
+        attendance = sub.attendance or {}
+        attendance[date] = bool(status)
+        sub.attendance = attendance
+
+        sub.used_lessons = sum(1 for s in attendance.values() if s)
+        sub.save()
+        check_subscription_expiry.delay(sub.id)
+        check_and_delete_sub(sub.id)
+        return Response({'message': 'Attendance updated', 'attendance': sub.attendance, 'total_lessons':sub.total_lessons})
+    
+def check_and_delete_sub(sub_id):
+    sub = Subscription.objects.get(id=sub_id)
+    if len(sub.attendance) == sub.total_lessons:
+        sub.delete()
 
 class DeleteSubView(APIView):
     authentication_classes = [TelegramAuthentication]

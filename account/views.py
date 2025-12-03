@@ -32,7 +32,7 @@ class TelegramLoginView(APIView):
 class ChildRegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    # permission_classes = [IsParentOrAdmin]
+    permission_classes = [IsParentOrAdmin]
     authentication_classes = [TelegramAuthentication]
 
 
