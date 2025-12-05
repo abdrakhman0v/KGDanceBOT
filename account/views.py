@@ -1,9 +1,8 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import generics
 
-from .models import  User
+from .models import User
 from .serializers import UserSerializer
 from .auth import TelegramAuthentication
 from .permissions import IsParentOrAdmin
@@ -17,7 +16,6 @@ class TelegramRegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail":"user created succeful"})
-    
 
 class TelegramLoginView(APIView):
     authentication_classes = [TelegramAuthentication]
@@ -28,12 +26,16 @@ class TelegramLoginView(APIView):
         serializer = UserSerializer(user)
         return Response(serializer.data, status=200)
 
-
-class ChildRegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsParentOrAdmin]
+class ChildRegisterView(APIView):
     authentication_classes = [TelegramAuthentication]
+    permission_classes = [IsParentOrAdmin]
+    def post(self, request):
+        telegram_id = int(request.headers.get("X-Telegram-Id"))
+        parent = User.objects.get(telegram_id=telegram_id)
+        serializer = UserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(parent=parent)
+        return Response({"detail":"child created succeful"})
 
 
 class CheckRoleView(APIView):
@@ -54,7 +56,7 @@ class GetChildsView(APIView):
         serializer = UserSerializer(children, many=True)
         return Response(serializer.data)
     
-class GetUserView(APIView):
+class GetUserByPhoneView(APIView):
     authentication_classes = [TelegramAuthentication]
 
     def get(self, request):
@@ -62,7 +64,14 @@ class GetUserView(APIView):
         user = get_object_or_404(User, phone=phone)
         serializer = UserSerializer(user)
         return Response(serializer.data, status=200)
-        
+    
+class GetAdminsView(APIView):
+    authentication_classes = [TelegramAuthentication]
+
+    def get(self, request):
+        admins = User.objects.filter(role='admin')
+        serializer = UserSerializer(admins, many=True)
+        return Response(serializer.data, status=200)
 
 
 

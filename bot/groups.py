@@ -10,6 +10,7 @@ class CreateGroup:
         self.bot = bot
         self.group_data = {}
         self.bot.callback_query_handler(func=lambda call:call.data in ['mon/wed/fri', 'tue/thu/sat', 'sat/sun'])(self.choose_day)
+        self.bot.callback_query_handler(func=lambda call:call.data.startswith('get_admin_'))(self.get_teacher)
 
     def create_group(self, call):
         if call.message.chat.id in self.group_data:
@@ -30,7 +31,7 @@ class CreateGroup:
         time_str = message.text.strip()
         
         try:
-            valid_time = datetime.strptime(time_str, "%H:%M")  
+            datetime.strptime(time_str, "%H:%M")  
         except ValueError:
             self.bot.send_message(message.chat.id, "❌ Неверный формат времени. Введите в формате ЧЧ:ММ (например, 18:30).")
             self.bot.register_next_step_handler(message, self.get_time)
@@ -38,8 +39,19 @@ class CreateGroup:
 
         self.group_data[message.chat.id]['time'] = time_str
 
-        self.bot.send_message(message.chat.id, 'Введите возраст для группы:')
-        self.bot.register_next_step_handler(message, self.get_age)
+        response = requests.get("http://127.0.0.1:8000/account/get_admins/", headers={"X-Telegram-Id":str(message.from_user.id)})
+        admins = response.json()
+        markup = types.InlineKeyboardMarkup()
+        for admin in admins:
+            markup.add(types.InlineKeyboardButton(f"{admin['last_name']} {admin['first_name']}", callback_data=f'get_admin_{admin['id']}'))
+        self.bot.send_message(message.chat.id, 'Укажите хореографа:', reply_markup=markup)
+
+    def get_teacher(self, call):
+        teacher = call.data.split('_')[2]
+        self.group_data[call.message.chat.id]['teacher'] = teacher
+
+        self.bot.send_message(call.message.chat.id, 'Введите возраст для группы: ')
+        self.bot.register_next_step_handler(call.message, self.get_age)
 
     def get_age(self, message):
         age = message.text.strip()
@@ -59,6 +71,7 @@ class CreateGroup:
         data = {
             'title':self.group_data[call.message.chat.id]['title'],
             'time':self.group_data[call.message.chat.id]['time'],
+            'teacher':self.group_data[call.message.chat.id]['teacher'],
             'age':self.group_data[call.message.chat.id]['age'],
             'days':days
         }
@@ -68,11 +81,7 @@ class CreateGroup:
             if response.status_code == 201:
                 self.bot.send_message(call.message.chat.id, f'Группа "{self.group_data[call.message.chat.id]['title']} {self.group_data[call.message.chat.id]['time']}" создана. ✅')
             else:
-                error_text=f'Ошибка при создании: {response.status_code}\n{response.text}\n{call.message.text}'
-                if len(error_text) > 1000:
-                    error_text = error_text[:1000] + '...'
-                self.bot.send_message(call.message.chat.id, error_text)
-            
+                self.bot.send_message(call.message.chat.id, f'Ошибка при создании: {response.status_code}\n{response.text}\n{call.message.text}')
             self.bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
 
             from bot.main import list_group_handler
@@ -176,6 +185,8 @@ class DetailGroup:
             time = response.json().get('time')
             days = response.json().get('days')
             amount = response.json().get('user_count')
+            teachers_first_name = response.json().get('teachers_first_name')
+            teachers_last_name = response.json().get('teachers_last_name')
         else:
             self.bot.send_message(call.message.chat.id, f'Ошибка: {response.status_code} {response.text}')
             return
@@ -197,6 +208,7 @@ class DetailGroup:
         text = f"""
 <b>📌 Название группы:</b> {title}
 <b>⏰ Время:</b> {time[:5]}
+<b>👤 Хореограф:</b> {teachers_first_name} {teachers_last_name}
 <b>📅 Дни занятий:</b> {show_days}
 <b>👥 Количество учеников:</b> {amount}
 """
@@ -247,7 +259,7 @@ class DetailGroup:
             self.bot.register_next_step_handler(message, lambda msg: self.get_phone(msg))
             return
         
-        response = requests.get(f'http://127.0.0.1:8000/account/get_user/', headers={'X-Telegram-Id':str(message.from_user.id)} ,params={'phone':phone})
+        response = requests.get(f'http://127.0.0.1:8000/account/get_user_by_phone/', headers={'X-Telegram-Id':str(message.from_user.id)} ,params={'phone':phone})
         try:
             if response.status_code == 200:
                 data=response.json()

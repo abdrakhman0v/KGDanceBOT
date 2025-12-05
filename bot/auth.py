@@ -5,7 +5,7 @@ from .utils import show_menu
 
 API_URL = 'http://127.0.0.1:8000/account/'
 
-class Register:
+class Auth:
 
     def __init__(self, bot):
         self.bot = bot
@@ -22,7 +22,7 @@ class Register:
             name = data.get('first_name')
             role = data.get('role')
             show_menu(self.bot, role, message.chat.id)
-            self.bot.send_message(message.chat.id,f'С возвращением {name}! 🥳')
+            self.bot.send_message(message.chat.id,f'С возвращением, {name}! 🥳')
 
         elif response.status_code == 404:
 
@@ -48,16 +48,12 @@ class Register:
 
     def get_name(self, message, telegram_id):
         name = message.text.strip()
-        self.user_data[telegram_id]['name'] = name
-
-        if not name:
-            self.bot.send_message(message.chat.id, "Имя не может быть пустым. Попробуйте еще раз:")
-            self.bot.register_next_step_handler(message, self.get_name)
+        self.user_data[telegram_id]['name']=name
             
         self.bot.send_message(message.chat.id, 'Введите фамилию: ')
         self.bot.register_next_step_handler_by_chat_id(chat_id=message.chat.id, 
                                                        callback=lambda message:self.get_last_name(message, telegram_id))
-
+        
 
     def get_last_name(self, message, telegram_id):
         last_name = message.text.strip()
@@ -75,7 +71,6 @@ class Register:
         
     
     def get_phone(self, message, telegram_id):
-        # print(f"USER_DATA for {telegram_id}:", self.user_data.get(telegram_id))
 
         if message.contact:
             phone = message.contact.phone_number
@@ -162,19 +157,18 @@ class ChildRegister:
         chat_id = message.chat.id
         self.child_data[chat_id]['last_name'] = last_name
 
-        child_telegram_id = random.randint(10*8, 10*10)
+        child_telegram_id = random.randint(10**8, 10**10)
 
         data={
             'telegram_id':child_telegram_id,
             'first_name':self.child_data[chat_id]['first_name'],
             'last_name':self.child_data[chat_id]['last_name'],
-            'parent':message.from_user.id,
             'role':'child'
         }
 
         try:
             response=requests.post(f"{API_URL}child_register/", json=data, headers={'X-Telegram-Id':str(message.from_user.id)})
-            if response.status_code == 201:
+            if response.status_code in [200,201]:
                 self.bot.send_message(chat_id, f"✅ Ребёнок, {self.child_data[chat_id]['last_name']} {self.child_data[chat_id]['first_name']}, зарегистрирован! ")
             else:
                 self.bot.send_message(chat_id, f'Ошибка при регистрации: {response.status_code}\n{response.text}')

@@ -3,7 +3,7 @@ from telebot import types
 import requests
 from decouple import config
 
-from bot.auth import Register, ChildRegister
+from bot.auth import Auth, ChildRegister
 from bot.groups import CreateGroup, ListGroup, DetailGroup, DetailGroupUser, UpdateGroup, DeleteGroup
 from bot.subscriptions import SubscriptionHandler
 from .utils import show_menu
@@ -15,7 +15,7 @@ WEBHOOK_URL = 'https://lena-nonmetalliferous-pura.ngrok-free.dev/webhook/'
 
 requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}",)
 
-register_handler = Register(bot)
+register_handler = Auth(bot)
 @bot.message_handler(commands=['start'])
 def authentication(message):
     register_handler.authentication(message)
