@@ -42,9 +42,9 @@ INSTALLED_APPS = [
 
     'rest_framework',
 
-    'account',
-    'group',
-    'subscription',
+    'apps.account',
+    'apps.group',
+    'apps.subscription',
     'bot'
 ]
 
@@ -137,7 +137,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'account.auth.TelegramAuthentication'
+        'apps.account.auth.TelegramAuthentication'
     ),
     'DATETIME_FORMAT': "%d.%m.%Y %H:%M",
     'DATE_FORMAT': "%d.%m.%Y",

@@ -8,9 +8,9 @@ from django.db.models import ProtectedError
 from .models import Group
 from .serializers import GroupSerializer
 from utils.permissions import IsAdmin
-from account.auth import TelegramAuthentication
-from account.models import User
-from account.serializers import UserSerializer
+from apps.account.auth import TelegramAuthentication
+from apps.account.models import User
+from apps.account.serializers import UserSerializer
 
 class GroupCreateView(generics.CreateAPIView):
     queryset = Group.objects.all()

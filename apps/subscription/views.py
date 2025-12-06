@@ -1,11 +1,9 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import generics
 
-from account.models import User
-from account.auth import TelegramAuthentication
-
+from apps.account.models import User
+from apps.account.auth import TelegramAuthentication
 
 from .models import Subscription
 from .serializers import SubscriptionSerializer

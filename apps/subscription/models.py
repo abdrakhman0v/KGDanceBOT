@@ -2,8 +2,8 @@ from django.db import models
 
 from django.utils import timezone
 
-from account.models import User
-from group.models import Group
+from apps.account.models import User
+from apps.group.models import Group
 
 class Subscription(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='subscriptions')

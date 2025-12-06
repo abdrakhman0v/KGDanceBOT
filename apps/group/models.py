@@ -1,6 +1,6 @@
 from django.db import models
 
-from account.models import User
+from apps.account.models import User
 
 class Group(models.Model):
     DAYS = (
