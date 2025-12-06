@@ -31,7 +31,7 @@ class Auth:
             markup = types.InlineKeyboardMarkup()
             markup.row(
                 types.InlineKeyboardButton('Родитель', callback_data=f'role_parent_{telegram_id}'),
-                types.InlineKeyboardButton('Пользователь', callback_data=f'role_user_{telegram_id}')
+                types.InlineKeyboardButton('Пользователь', callback_data=f'role_student_{telegram_id}')
             )
             self.bot.send_message(message.chat.id,'Укажите кто вы:', reply_markup=markup)
 
@@ -85,7 +85,6 @@ class Auth:
             return
 
         self.user_data[telegram_id]['phone'] = phone
-        # remove_markup = types.ReplyKeyboardRemove()
 
         data = {
             'telegram_id':telegram_id,
@@ -102,7 +101,7 @@ class Auth:
                 role = self.user_data[message.chat.id]['role']
                 show_menu(self.bot, role, message.chat.id)
 
-                self.bot.send_message(message.chat.id, 'Добро пожаловать! 🎉 Вы зарегистрированы.')
+                self.bot.send_message(message.chat.id, 'Добро пожаловать! 🎉 Вы зарегистрированы.', reply_markup=types.ReplyKeyboardRemove())
             else:
                 self.bot.send_message(message.chat.id, f'Ошибка при регистрации: {response.status_code}\n{response.text}')
         except Exception as e:

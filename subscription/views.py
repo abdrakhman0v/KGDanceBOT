@@ -2,12 +2,10 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics
-from rest_framework.decorators import api_view, authentication_classes
 
 from account.models import User
-from account.serializers import UserSerializer
 from account.auth import TelegramAuthentication
-from account.permissions import IsAdmin
+
 
 from .models import Subscription
 from .serializers import SubscriptionSerializer

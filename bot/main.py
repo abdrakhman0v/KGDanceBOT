@@ -66,7 +66,6 @@ def timetable_handler(call):
 @bot.callback_query_handler(func=lambda call:call.data.startswith('timetable_'))
 def days_handler(call):
     days = call.data.split('_')[1]
-    print(days)
     response = requests.get(f"{API_URL}/group/list/", params={'days':days}, headers={"X-Telegram-Id":str(call.from_user.id)})
     if response.status_code == 200:
         groups = response.json()
@@ -209,7 +208,7 @@ def start_update(call):
 
 @bot.callback_query_handler(func=lambda call:call.data.startswith('confirm_delete_group'))
 def confirm_delete_group(call):
-    group_id = call.data.split('_')[2]
+    group_id = call.data.split('_')[3]
 
     markup = types.InlineKeyboardMarkup()
     markup.row(

@@ -4,27 +4,39 @@ from datetime import datetime
 
 API_URL = "http://127.0.0.1:8000/group/"
 
-# to-do добавить функции отмены создания, редактирования
+# to-do добавить функции отмены добавления
 class CreateGroup:
     def __init__(self, bot):
         self.bot = bot
         self.group_data = {}
         self.bot.callback_query_handler(func=lambda call:call.data in ['mon/wed/fri', 'tue/thu/sat', 'sat/sun'])(self.choose_day)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('get_admin_'))(self.get_teacher)
+        self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_create_group')(self.cancel_create)
+
+    def cancel_create(self, call):
+        self.group_data.pop(call.message.chat.id)
+        self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
+        self.bot.send_message(call.message.chat.id, '❌ Создание группы отменено.')
+
+    def cancel_markup(self):
+        markup=types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("❌ Отменить:", callback_data="cancel_create_group"))
+        return markup
 
     def create_group(self, call):
         if call.message.chat.id in self.group_data:
             self.bot.answer_callback_query(call.id, "⏳ Начните заново.")
             return
+        self.group_data[call.message.chat.id] = {}
 
-        self.bot.send_message(call.message.chat.id, 'Введите название группы: ')
+        self.bot.send_message(call.message.chat.id, 'Введите название группы: ', reply_markup=self.cancel_markup())
         self.bot.register_next_step_handler(call.message, self.get_title)
 
     def get_title(self, message):
         title = message.text.strip()
-        self.group_data[message.chat.id] = {'title':title}
+        self.group_data[message.chat.id]['title'] = title
 
-        self.bot.send_message(message.chat.id, 'Введите время группы: ')
+        self.bot.send_message(message.chat.id, 'Введите время группы: ', reply_markup=self.cancel_markup())
         self.bot.register_next_step_handler(message, self.get_time)
     
     def get_time(self, message):
@@ -50,7 +62,7 @@ class CreateGroup:
         teacher = call.data.split('_')[2]
         self.group_data[call.message.chat.id]['teacher'] = teacher
 
-        self.bot.send_message(call.message.chat.id, 'Введите возраст для группы: ')
+        self.bot.send_message(call.message.chat.id, 'Введите возраст для группы: ', reply_markup=self.cancel_markup())
         self.bot.register_next_step_handler(call.message, self.get_age)
 
     def get_age(self, message):
@@ -79,7 +91,7 @@ class CreateGroup:
         try:
             response = requests.post(f'{API_URL}create/', headers={'X-Telegram-Id':str(telegram_id)}, json=data)
             if response.status_code == 201:
-                self.bot.send_message(call.message.chat.id, f'Группа "{self.group_data[call.message.chat.id]['title']} {self.group_data[call.message.chat.id]['time']}" создана. ✅')
+                self.bot.send_message(call.message.chat.id, f'Группа "{self.group_data[call.message.chat.id]['title']} {self.group_data[call.message.chat.id]['time']} {days}" создана. ✅')
             else:
                 self.bot.send_message(call.message.chat.id, f'Ошибка при создании: {response.status_code}\n{response.text}\n{call.message.text}')
             self.bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
@@ -118,7 +130,7 @@ class ListGroup:
             time = group['time'][:5] 
             age = group['age']
             group_id = group['id']
-            markup.add(types.InlineKeyboardButton(f"{time} {title} Возраст: {age}", callback_data=f'group_detail_{group_id}'))
+            markup.add(types.InlineKeyboardButton(f"{time} {title} возраст: {age}", callback_data=f'group_detail_{group_id}'))
 
         markup.add(types.InlineKeyboardButton('⬅️Назад', callback_data='groups'))
 
@@ -171,6 +183,7 @@ class DetailGroup:
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('get_child_'))(self.start_get_childs)
         self.bot.callback_query_handler(func=lambda call:call.data == 'confirm_add_client')(self.add_client)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('users_list_'))(self.users_list)
+        self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_add_client')(self.cancel_add_client)
     
 
     def detail_group(self, call):
@@ -242,9 +255,22 @@ class DetailGroup:
                                    message_id=call.message.message_id,
                                    parse_mode='HTML',
                                    reply_markup=markup)
+        
+# -------------------ДОБАВЛЕНИЕ КЛИЕНТА В ГРУППУ----------------------------------
+        
+    def cancel_add_client(self, call):
+        chat_id = call.message.chat.id
+        self.user_to_add.pop(chat_id)
+        self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)
+        self.bot.send_message(chat_id, '❌ Добавление пользователя отменено.')
+    
+    def cancel_markup(self):
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
+        return markup
     
     def find_user(self, call):
-        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона(+996): ')
+        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона(+996): ', reply_markup=self.cancel_markup())
         self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, 
                                                        callback=lambda message: self.get_phone(message)
                                                        )
@@ -255,7 +281,7 @@ class DetailGroup:
         if phone.startswith('9'):
             phone = '+' + phone 
         if not phone or not phone.startswith("+") or not phone[1:].isdigit() or not len(phone) == 13:
-            self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ')
+            self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ', reply_markup=self.cancel_markup())
             self.bot.register_next_step_handler(message, lambda msg: self.get_phone(msg))
             return
         
@@ -345,8 +371,6 @@ class DetailGroup:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton('Добавить', callback_data='confirm_add_client'))
         markup.add(types.InlineKeyboardButton('⬅️ Назад', callback_data=f'get_child_{child['parent']}'))
-
-        # markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_sub'))
 
         text = (
             "📌 <b>Информация о ребёнке:</b>\n\n"
@@ -596,8 +620,9 @@ class UpdateGroup:
     def __init__(self, bot):
         self.bot = bot
         self.edit_data = {}
-        self.bot.callback_query_handler(func=lambda call: call.data in ['edit_title', 'edit_time', 'edit_days', 'mon/wed/fri', 'tue/thu/sat', 'sat/sun','save_changes', 'cancel_edit'])(self.callback_handler)
-
+        self.bot.callback_query_handler(func=lambda call: call.data in ['edit_title', 'edit_time', 'edit_teacher','edit_days', 'save_changes', 'cancel_edit'])(self.callback_handler)
+        self.bot.callback_query_handler(func=lambda call: call.data.startswith('set_new_teacher_'))(self.callback_handler)
+        self.bot.callback_query_handler(func=lambda call: call.data.startswith('set_new_days_'))(self.callback_handler)
     def start_update(self, call):
         group_id = call.data.split('_')[1]
         self.edit_data[call.message.chat.id] = {'group_id':group_id, 'telegram_id':call.from_user.id,'data': {}}
@@ -607,6 +632,7 @@ class UpdateGroup:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("✏️ Изменить название", callback_data='edit_title'))
         markup.add(types.InlineKeyboardButton("⏰ Изменить время", callback_data='edit_time'))
+        markup.add(types.InlineKeyboardButton("👤 Изменить учителя", callback_data='edit_teacher'))
         markup.add(types.InlineKeyboardButton("📅 Изменить дни", callback_data='edit_days'))
         markup.add(types.InlineKeyboardButton("✅ Сохранить изменения", callback_data='save_changes'))
         markup.add(types.InlineKeyboardButton("❌ Отменить", callback_data='cancel_edit'))
@@ -614,20 +640,33 @@ class UpdateGroup:
 
     def callback_handler(self, call):
         if call.data == 'edit_title':
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.bot.send_message(call.message.chat.id, 'Введите новое название группы:')
             self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, self.get_title)
         elif call.data == 'edit_time':
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.bot.send_message(call.message.chat.id, 'Введите новое время группы:')
             self.bot.register_next_step_handler(call.message, self.get_time)
+        elif call.data == 'edit_teacher':
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
+            self.get_teachers(call)
+        elif call.data.startswith('set_new_teacher_'):
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
+            self.set_new_teacher(call)
         elif call.data == 'edit_days':
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.choose_days(call)
-        elif call.data in ['mon/wed/fri', 'tue/thu/sat', 'sat/sun']:
+        elif call.data.startswith('set_new_days_'):
+            print(0)
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.get_days(call)
         elif call.data == 'save_changes':
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.save_changes(call.message.chat.id,call.from_user.id,call.message)
         elif call.data == 'cancel_edit':
+            self.edit_data.pop(call.message.chat.id)
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.bot.send_message(call.message.chat.id, "Редактирование отменено ❌")
-            self.edit_data.pop(call.message.chat.id, None)
 
     def get_title(self, message):
         title = message.text
@@ -638,7 +677,7 @@ class UpdateGroup:
         time_str = message.text.strip()
 
         try:
-            validate_time = datetime.strptime(time_str, '%H:%M')
+            datetime.strptime(time_str, '%H:%M')
         except ValueError:
             self.bot.send_message(message.chat.id, "❌ Неверный формат времени. Введите в формате ЧЧ:ММ (например, 18:30).")
             self.bot.register_next_step_handler(message, self.get_time)
@@ -647,15 +686,29 @@ class UpdateGroup:
         self.edit_data[message.chat.id]['data']['time'] = time_str
         self.show_edit_menu(message.chat.id)
 
+    def get_teachers(self, call):
+        response = requests.get("http://127.0.0.1:8000/account/get_admins/", headers={"X-Telegram-Id":str(call.from_user.id)})
+        markup = types.InlineKeyboardMarkup()
+        admins = response.json()
+        for admin in admins:
+            print(admin)
+            markup.add(types.InlineKeyboardButton(f"{admin['last_name']} {admin['first_name']}", callback_data=f"set_new_teacher_{admin['id']}"))
+        self.bot.send_message(call.message.chat.id, 'Выберите учителя:', reply_markup=markup)
+
+    def set_new_teacher(self, call):
+        teacher_id = call.data.split('_')[3]
+        self.edit_data[call.message.chat.id]['data']['teacher'] = teacher_id
+        self.show_edit_menu(call.message.chat.id)
+
     def choose_days(self, call):
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('пн/ср/пт', callback_data='mon/wed/fri'))
-        markup.add(types.InlineKeyboardButton('вт/чт/сб', callback_data='tue/thu/sat'))
-        markup.add(types.InlineKeyboardButton('сб/вс', callback_data='sat/sun'))
+        markup.add(types.InlineKeyboardButton('пн/ср/пт', callback_data='set_new_days_mon/wed/fri'))
+        markup.add(types.InlineKeyboardButton('вт/чт/сб', callback_data='set_new_days_tue/thu/sat'))
+        markup.add(types.InlineKeyboardButton('сб/вс', callback_data='set_new_days_sat/sun'))
         self.bot.send_message(call.message.chat.id, 'Выберите дни: ', reply_markup=markup)
 
     def get_days(self, call):
-        days = call.data
+        days = call.data.split('_')[3]
         self.edit_data[call.message.chat.id]['data']['days'] = days
         self.show_edit_menu(call.message.chat.id)
 
@@ -720,10 +773,10 @@ class DeleteGroup:
 
     def delete(self, call):
         telegram_id = call.from_user.id
-        group_id = call.data.split('_')[1]
+        group_id = call.data.split('_')[2]
         
-        get_days = requests.get(f'{API_URL}detail/{group_id}/', headers={'X-Telegram-Id':str(telegram_id)})
-        days = get_days.json().get('days')
+        # get_days = requests.get(f'{API_URL}detail/{group_id}/', headers={'X-Telegram-Id':str(telegram_id)})
+        # days = get_days.json().get('days')
 
         response = requests.delete(f'{API_URL}delete/{group_id}/', headers={'X-Telegram-Id':str(telegram_id)})
 
@@ -734,11 +787,11 @@ class DeleteGroup:
         else:
             self.bot.send_message(call.message.chat.id, f'Ошибка при удалении: {response.status_code} {response.text}')
             
-        from bot.main import list_group_handler
-        if days == 'mon/wed/fri':
-            list_group_handler.groups_list_mon(call.message.chat.id, telegram_id, call.message.message_id)
-        elif days == 'tue/thu/sat':
-            list_group_handler.groups_list_tue(call.message.chat.id, telegram_id, call.message.message_id)
-        elif days == 'sat/sun':
-            list_group_handler.groups_list_sun(call.message.chat.id, telegram_id, call.message.message_id)
+        # from bot.main import list_group_handler
+        # if days == 'mon/wed/fri':
+        #     list_group_handler.groups_list_mon(call.message.chat.id, telegram_id, call.message.message_id)
+        # elif days == 'tue/thu/sat':
+        #     list_group_handler.groups_list_tue(call.message.chat.id, telegram_id, call.message.message_id)
+        # elif days == 'sat/sun':
+        #     list_group_handler.groups_list_sun(call.message.chat.id, telegram_id, call.message.message_id)
 
