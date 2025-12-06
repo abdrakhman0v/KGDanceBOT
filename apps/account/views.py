@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from .models import User
 from .serializers import UserSerializer
 from .auth import TelegramAuthentication
-from .permissions import IsParentOrAdmin
+from ...utils.permissions import IsParentOrAdmin
 
 
 class TelegramRegisterView(APIView):

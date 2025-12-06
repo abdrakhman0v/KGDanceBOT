@@ -7,7 +7,7 @@ from django.db.models import ProtectedError
 
 from .models import Group
 from .serializers import GroupSerializer
-from account.permissions import IsAdmin
+from utils.permissions import IsAdmin
 from account.auth import TelegramAuthentication
 from account.models import User
 from account.serializers import UserSerializer
