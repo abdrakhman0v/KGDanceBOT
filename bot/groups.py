@@ -179,11 +179,9 @@ class DetailGroup:
         self.user_to_add = {}
 
         self.bot.callback_query_handler(func=lambda call:call.data == 'add_client')(self.find_user)
-        self.bot.callback_query_handler(func=lambda call:call.data.startswith('select_child_'))(self.select_child)
-        self.bot.callback_query_handler(func=lambda call:call.data.startswith('get_child_'))(self.start_get_childs)
-        self.bot.callback_query_handler(func=lambda call:call.data == 'confirm_add_client')(self.add_client)
+        self.bot.callback_query_handler(func=lambda call:call.data.startswith('confirm_add_client_'))(self.add_client)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('users_list_'))(self.users_list)
-        self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_add_client')(self.cancel_add_client)
+        # self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_add_client')(self.cancel_add_client)
     
 
     def detail_group(self, call):
@@ -258,19 +256,20 @@ class DetailGroup:
         
 # -------------------ДОБАВЛЕНИЕ КЛИЕНТА В ГРУППУ----------------------------------
         
-    def cancel_add_client(self, call):
-        chat_id = call.message.chat.id
-        self.user_to_add.pop(chat_id)
-        self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)
-        self.bot.send_message(chat_id, '❌ Добавление пользователя отменено.')
+    # def cancel_add_client(self, call):
+    #     chat_id = call.message.chat.id
+    #     self.user_to_add.pop(chat_id)
+    #     self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)
+    #     self.bot.send_message(chat_id, '❌ Добавление пользователя отменено.')
     
-    def cancel_markup(self):
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
-        return markup
+    # def cancel_markup(self):
+    #     markup = types.InlineKeyboardMarkup()
+    #     markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
+    #     return markup
     
     def find_user(self, call):
-        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона(+996): ', reply_markup=self.cancel_markup())
+        self.user_to_add[call.message.chat.id] = {}
+        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона(+996): ')
         self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, 
                                                        callback=lambda message: self.get_phone(message)
                                                        )
@@ -280,8 +279,8 @@ class DetailGroup:
 
         if phone.startswith('9'):
             phone = '+' + phone 
-        if not phone or not phone.startswith("+") or not phone[1:].isdigit() or not len(phone) == 13:
-            self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ', reply_markup=self.cancel_markup())
+        if not phone or not phone.startswith("+") or not phone[1:].isdigit():
+            self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ')
             self.bot.register_next_step_handler(message, lambda msg: self.get_phone(msg))
             return
         
@@ -295,28 +294,59 @@ class DetailGroup:
                 show_role = {'parent':'Родитель','user':'Пользователь', 'student':'Ученик'}.get(role, role)
                 user_id = data.get('id')
 
-                self.user_to_add[message.chat.id] = {'user_id':user_id}
-                self.user_to_add[message.chat.id]['first_name'] = first_name
-                self.user_to_add[message.chat.id]['last_name'] = last_name
+                if role == 'parent':
+                    markup = types.InlineKeyboardMarkup()
+                    markup.row(
+                        types.InlineKeyboardButton('Добавить', callback_data=f'confirm_add_client_{user_id}'),
+                        types.InlineKeyboardButton('Ввести номер заново', callback_data='add_client')
+                        )
+                    # markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
 
-                markup = types.InlineKeyboardMarkup()
-                markup.row(
-                    types.InlineKeyboardButton('Добавить', callback_data='confirm_add_client'),
-                    types.InlineKeyboardButton('Ввести номер заново', callback_data='add_client')
-                    )
-                markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
-                text = (
- "📌 <b>Информация о клиенте:</b>\n\n"
-    f"👤 Имя: <b>{first_name}</b>\n"
-    f"👤 Фамилия: <b>{last_name}</b>\n"
-    f"🎯 Роль: <b>{show_role}</b>\n")
+                    parent_text = (
+                    "📌 <b>Информация о клиенте:</b>\n\n"
+                    f"👤 Имя: <b>{first_name}</b>\n"
+                    f"👤 Фамилия: <b>{last_name}</b>\n"
+                    f"🎯 Роль: <b>{show_role}</b>\n")
 
-                self.bot.send_message(message.chat.id,
+                    self.bot.send_message(message.chat.id, parent_text, parse_mode='HTML', reply_markup=markup)
+
+                    response = requests.get(f"{'http://127.0.0.1:8000/account/get_childs/'}", 
+                                            headers={'X-Telegram-Id':str(message.from_user.id)}, 
+                                            params={'user_id':user_id})
+                    if response.status_code == 200:
+                        childs = response.json()
+                        for child in childs:
+                            markup_for_childs = types.InlineKeyboardMarkup()
+                            child_text = (
+                                "📌 <b>Информация о ребенке:</b>\n\n"
+                                f"👶 Имя: <b>{child['first_name']}</b>\n"
+                                f"👶 Фамилия: <b>{child['last_name']}</b>\n"
+                            )
+                            markup_for_childs.add(types.InlineKeyboardButton("Добавить ребенка", 
+                                                                             callback_data=f"confirm_add_client_{child['id']}"))
+                            self.bot.send_message(message.chat.id, 
+                                                  child_text, 
+                                                  parse_mode="HTML",
+                                                  reply_markup=markup_for_childs)
+
+                else:
+                    markup = types.InlineKeyboardMarkup()
+                    markup.row(
+                        types.InlineKeyboardButton('Добавить', callback_data=f'confirm_add_client_{user_id}'),
+                        types.InlineKeyboardButton('Ввести номер заново', callback_data='add_client')
+                        )
+                    # markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
+                    text = (
+                    "📌 <b>Информация о клиенте:</b>\n\n"
+                    f"👤 Имя: <b>{first_name}</b>\n"
+                    f"👤 Фамилия: <b>{last_name}</b>\n"
+                    f"🎯 Роль: <b>{show_role}</b>\n")
+
+                    self.bot.send_message(message.chat.id,
                                       text=text,
                                       parse_mode='HTML',
                                       reply_markup=markup)
-                if role == 'parent':
-                    self.get_childs(message, user_id)
+                
                 
             elif response.status_code == 404:
                 self.bot.send_message(message.chat.id, '🤷🏻‍♂️ Пользователя с таким номером не существует. Попробуйте снова:')
@@ -327,92 +357,29 @@ class DetailGroup:
         except Exception as e:
                 self.bot.send_message(message.chat.id, f'Ошибка: {e}')
 
-    def get_childs(self, message, user_id, telegram_id=None):
-        if telegram_id == None:
-            telegram_id = message.from_user.id
-        try:
-            response = requests.get(f"{'http://127.0.0.1:8000/account/get_childs/'}", headers={'X-Telegram-Id':str(telegram_id)}, params={'user_id':user_id})
-            if response.status_code == 200:
-                data = response.json()
-                print(data)
-                markup = types.InlineKeyboardMarkup()
-                for child in data:
-                    child_first_name = child.get('first_name')
-                    child_last_name = child.get('last_name')
-                    child_id = child.get('id')
-
-                    markup.add(types.InlineKeyboardButton(f'{child_first_name} {child_last_name}', callback_data=f'select_child_{child_id}'))
-                markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
-                
-                self.user_to_add[message.chat.id]['children'] = data
-                text = "📌 <b>Выберите ребёнка, для добавления в эту группу:</b>"
-                self.bot.send_message(message.chat.id,
-                                    text=text,
-                                    parse_mode='HTML',
-                                    reply_markup=markup)
-                
-
-            else:
-                self.bot.send_message(message.chat.id, f'Ошибка: {response.status_code} {response.text}')
-        except Exception as e:
-                        self.bot.send_message(message.chat.id, f'Ошибка: {e}')
-
-    def select_child(self, call):
-        child_id = call.data.split('_')[2]
-        children = self.user_to_add[call.message.chat.id]['children']
-        child = next((c for c in children if str(c['id']) == child_id), None)
-
-        self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)           
-
-        self.user_to_add[call.message.chat.id]['user_id']=child['id']
-        self.user_to_add[call.message.chat.id]['first_name']=child['first_name']
-        self.user_to_add[call.message.chat.id]['last_name']=child['last_name']
-
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('Добавить', callback_data='confirm_add_client'))
-        markup.add(types.InlineKeyboardButton('⬅️ Назад', callback_data=f'get_child_{child['parent']}'))
-
-        text = (
-            "📌 <b>Информация о ребёнке:</b>\n\n"
-            f"👶 Имя: <b>{child['first_name']}</b>\n"
-            f"👶 Фамилия: <b>{child['last_name']}</b>\n"
-        )
-
-        self.bot.send_message(
-            call.message.chat.id,
-            text=text,
-            parse_mode='HTML',
-            reply_markup=markup
-        )
-
-    def start_get_childs(self, call):
-        parent_id = call.data.split('_')[2]
-        self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
-        self.get_childs(call.message, parent_id, call.from_user.id)
-
-# to-do добавить удаления кнопок после добавления
     def add_client(self, call):
         chat_id = call.message.chat.id
         telegram_id = call.from_user.id
+        user_id = call.data.split('_')[3]
         data = {
-            'user_id':self.user_to_add[chat_id]['user_id'],
+            'user_id':user_id,
             'group_id':self.group_id[chat_id]
         }
         try:
             response = requests.patch(f"{API_URL}add_user/", json=data, headers={'X-Telegram-Id':str(telegram_id)})
             if response.status_code == 200:
                 r_data = response.json()
-                self.bot.send_message(chat_id, f'Добавлен новый пользователь {self.user_to_add[chat_id]["last_name"]} {self.user_to_add[chat_id]["first_name"]} в группу "{r_data["group_title"]} {r_data["group_time"][:5]}"')
-
                 self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)           
-
-                from bot.main import list_group_handler
-                if r_data['group_days'] == 'mon/wed/fri':
-                    list_group_handler.groups_list_mon(chat_id, telegram_id, call.message.message_id)
-                elif r_data['group_days'] == 'tue/thu/sat':
-                    list_group_handler.groups_list_tue(chat_id, telegram_id, call.message.message_id)
-                elif r_data['group_days'] == 'sat/sun':
-                    list_group_handler.groups_list_sun(chat_id, telegram_id, call.message.message_id)
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton(f"{r_data['last_name']} {r_data['first_name']}",
+                                                       callback_data=f"group_user_{r_data['telegram_id']}_{r_data['group_id']}"))
+                self.bot.send_message(chat_id, 
+                                      f'✅ Добавлен новый пользователь  в группу "{r_data["group_title"]} {r_data["group_time"][:5]}"',
+                                      reply_markup=markup)
+            elif response.status_code == 400:
+                r_data=response.json()
+                self.bot.send_message(chat_id,
+                        f'❌ {r_data["last_name"]} {r_data["first_name"]} уже состоит в группе "{r_data["group_title"]} {r_data["group_time"][:5]}"')
             else:   
                 self.bot.send_message(chat_id, f'Ошибка при добавлении: {response.status_code} {response.text}')    
         except Exception as e:
@@ -459,7 +426,6 @@ class DetailGroupUser:
                 active_text = "<b>Активные абонементы:</b>\n\n"
                 inactive_text = "<b>Неактивные абонементы:</b>\n\n"
                 for sub in subscriptions:
-                    print(sub)
                     if sub['group'] == int(group_id):
                         active_text += (
                         f" <b>{sub['last_name']}</b> <b>{sub['first_name']}</b>\n"
@@ -657,7 +623,6 @@ class UpdateGroup:
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.choose_days(call)
         elif call.data.startswith('set_new_days_'):
-            print(0)
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.get_days(call)
         elif call.data == 'save_changes':

@@ -53,25 +53,40 @@ class GroupDeleteAPIView(APIView):
         except ProtectedError:
             return Response({"detail":"❌ Невозможно удалить группу: в ней есть активные абонементы"}, status=400)
         
+class AddUserToGroup(APIView):
+    authentication_classes = [TelegramAuthentication]
+    def patch(self, request):
+        group_id = request.data.get('group_id')
+        user_id = request.data.get('user_id')
+
+        group = Group.objects.get(id=group_id)
+        user = User.objects.get(id=user_id)
+
+        if group.users.filter(id=user_id).exists():
+            return Response({'telegram_id':user.telegram_id,
+                         'last_name':f"{user.last_name}",
+                         'first_name':f"{user.first_name}",
+                         'group_id':f'{group_id}',
+                         'group_title':f"{group.title}",
+                         'group_time':f"{group.time}",
+                         'group_days':f"{group.days}"}, status=400)
         
-@api_view(['PATCH'])
-@authentication_classes([TelegramAuthentication])
-def add_user_to_group(request):
-    group_id = request.data.get('group_id')
-    user_id = request.data.get('user_id')
+        group.users.add(user)
+        return Response({'telegram_id':user.telegram_id,
+                         'last_name':f"{user.last_name}",
+                         'first_name':f"{user.first_name}",
+                         'group_id':f'{group_id}',
+                         'group_title':f"{group.title}",
+                         'group_time':f"{group.time}",
+                         'group_days':f"{group.days}"}, status=200)
 
-    group = Group.objects.get(id=group_id)
-    user = User.objects.get(id=user_id)
-    group.users.add(user)
-    return Response({'last_name':f"{user.last_name}", 'first_name':f"{user.first_name}", 'group_title':f"{group.title}",'group_time':f"{group.time}",'group_days':f"{group.days}"}, status=200)
+class DeletUserFromGroup(APIView):
+    authentication_classes = [TelegramAuthentication]
+    def patch(self, request):
+        group_id = request.data.get('group_id')
+        telegram_id = request.data.get('telegram_id')
 
-@api_view(['PATCH'])
-@authentication_classes([TelegramAuthentication])
-def delete_user_from_group(request):
-    group_id = request.data.get('group_id')
-    telegram_id = request.data.get('telegram_id')
-
-    group = Group.objects.get(id=group_id)
-    user = User.objects.get(telegram_id=telegram_id)
-    group.users.remove(user)
-    return Response({'group_days':f'{group.days}'})
+        group = Group.objects.get(id=group_id)
+        user = User.objects.get(telegram_id=telegram_id)
+        group.users.remove(user)
+        return Response({'group_days':f'{group.days}'})
