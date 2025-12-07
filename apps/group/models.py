@@ -18,6 +18,8 @@ class Group(models.Model):
 
     def __str__(self):
         return f'{self.title} {self.time}'
+    
+    
 
     class Meta:
         verbose_name = 'Группа'

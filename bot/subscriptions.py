@@ -146,7 +146,7 @@ class SubscriptionHandler:
             if response.status_code in [200, 201]:
                 sub = response.json()
                 self.bot.send_message(chat_id,
-                                      '✅ Абонемент создан успешно!\n'
+                                      "✅ Абонемент создан успешно!\n"
             f"👤 Клиент: {sub['first_name']} {sub['last_name']}\n"
             f"📅 Период: {sub['start_date']} - {sub['end_date']}\n"
             f"💰 Сумма: {sub['price']} сом\n"
@@ -215,7 +215,7 @@ class SubscriptionHandler:
         markup = types.InlineKeyboardMarkup()
         markup.row(
             types.InlineKeyboardButton('Подтвердить', callback_data=f'delete_sub_{sub_id}'),
-            types.InlineKeyboardButton('❌ Отмена', callback_data=f'group_user_{telegram_id}_{group_id}')
+            types.InlineKeyboardButton('⬅️ Назад', callback_data=f'group_user_{telegram_id}_{group_id}')
             )
         self.bot.edit_message_text(text='Вы уверены, что хотите удалить абонемент?',
             chat_id=call.message.chat.id,
@@ -226,7 +226,6 @@ class SubscriptionHandler:
     def delete_sub(self,call):
         sub_id = call.data.split('_')[2]
         response=requests.delete(f"{API_URL}delete_sub/{sub_id}/", headers={'X-Telegram-Id':str(call.from_user.id)}) 
-        print(response.status_code)
         self.bot.answer_callback_query(call.id, 'Абонемент удален')
 
     def show_my_subscriptions(self,call):

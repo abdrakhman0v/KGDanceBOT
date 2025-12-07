@@ -6,6 +6,7 @@ class GroupSerializer(serializers.ModelSerializer):
     teachers_first_name = serializers.CharField(source='teacher.first_name', read_only=True)
     teachers_last_name = serializers.CharField(source='teacher.last_name', read_only=True)
     user_count = serializers.SerializerMethodField()
+    time = serializers.TimeField(format="%H:%M")
 
     class Meta:
         model = Group
