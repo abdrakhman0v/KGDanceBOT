@@ -7,7 +7,7 @@ from apps.account.auth import TelegramAuthentication
 
 from .models import Subscription
 from .serializers import SubscriptionSerializer
-from .tasks import check_subscription_expiry, created_notification
+from .tasks import check_subscription_expiry, created_notification, deleted_notification
 
     
 class CreateSubView(APIView):
@@ -60,7 +60,7 @@ class DeleteSubView(APIView):
     authentication_classes = [TelegramAuthentication]
     def delete(self, request, sub_id):
         sub = Subscription.objects.get(id=sub_id)
-        sub.delete()
+        deleted_notification(sub.id)
         return Response({"detail":"Subscription deleted"})
 
     

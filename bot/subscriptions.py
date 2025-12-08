@@ -148,6 +148,7 @@ class SubscriptionHandler:
                 self.bot.send_message(chat_id,
                                       "✅ Абонемент создан успешно!\n"
             f"👤 Клиент: {sub['first_name']} {sub['last_name']}\n"
+            f"👥 Группа: {sub['group_title']} {sub['group_time'][:5]}\n"
             f"📅 Период: {sub['start_date']} - {sub['end_date']}\n"
             f"💰 Сумма: {sub['price']} сом\n"
             f"🏷 Кол-во занятий: {self.sub_data[message.chat.id]['total_lessons']}")

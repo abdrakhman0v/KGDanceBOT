@@ -9,7 +9,7 @@ class Group(models.Model):
         ('sat/sun','сб/вс')
     )
     title = models.CharField(max_length=100)
-    teacher = models.ForeignKey(User, on_delete=models.SET_NULL, related_name='teachers_groups', blank=True, null=True)
+    teacher = models.CharField(max_length=100, blank=True, null=True)
     users = models.ManyToManyField(User, related_name='groups', blank=True)
     time = models.TimeField(blank=True, null=True)
     days = models.CharField(max_length=50, choices=DAYS, null=True)
@@ -18,7 +18,6 @@ class Group(models.Model):
 
     def __str__(self):
         return f'{self.title} {self.time}'
-    
     
 
     class Meta:

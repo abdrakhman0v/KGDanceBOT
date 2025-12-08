@@ -69,9 +69,46 @@ def check_subscription_expiry(sub_id):
 @shared_task
 def created_notification(sub_id):
     sub = Subscription.objects.get(id=sub_id)
-    bot.send_message(sub.user.telegram_id,
+    time_str = sub.group.time.strftime("%H:%M") if sub.group.time else ""
+    try:
+        bot.send_message(sub.user.telegram_id,
                     "✅ Абонемент создан успешно!\n"
                     f"👤 Ф.И.О.: {sub.user.last_name} {sub.user.first_name}\n"
+                    f"👥 Группа: {sub.group.title} {time_str}\n"
                     f"📅 Период: {sub.start_date} - {sub.end_date}\n"
                     f"💰 Сумма: {sub.price} сом\n"
-                    f"🏷 Кол-во занятий: {sub.total_lessons}")
+                    f"🎟 Кол-во занятий: {sub.total_lessons}")
+    except ApiTelegramException:
+        bot.send_message(sub.user.parent.telegram_id,
+                    "✅ Абонемент создан успешно!\n"
+                    f"👤 Ф.И.О.: {sub.user.last_name} {sub.user.first_name}\n"
+                    f"👥 Группа: {sub.group.title} {time_str}\n"
+                    f"📅 Период: {sub.start_date} - {sub.end_date}\n"
+                    f"💰 Сумма: {sub.price} сом\n"
+                    f"🎟 Кол-во занятий: {sub.total_lessons}")
+
+@shared_task
+def deleted_notification(sub_id):
+    sub = Subscription.objects.get(id=sub_id)
+    time_str = sub.group.time.strftime("%H:%M") if sub.group.time else ""
+    try:
+        bot.send_message(sub.user.telegram_id, 
+                     "❗️Ваш абонемент был удален администраторам.\n\n"
+                     f"👤 Ф.И.О.: {sub.user.last_name} {sub.user.first_name}\n"
+                     f"👥 Группа: {sub.group.title} {time_str}\n"
+                     f"📅 Период: {sub.start_date} - {sub.end_date}\n"
+                     f"💰 Сумма: {sub.price} сом\n"
+                     f"🎟 Кол-во занятий: {sub.total_lessons}"
+                     )
+    except ApiTelegramException:
+        bot.send_message(sub.user.parent.telegram_id, 
+                     "❗️Абонемент вашего ребенка был удален администраторам.\n\n"
+                     f"👤 Ф.И.О.: {sub.user.last_name} {sub.user.first_name}\n"
+                     f"👥 Группа: {sub.group.title} {time_str}\n"
+                     f"📅 Период: {sub.start_date} - {sub.end_date}\n"
+                     f"💰 Сумма: {sub.price} сом\n"
+                     f"🎟 Кол-во занятий: {sub.total_lessons}"
+                     )
+    finally:
+        sub.delete()
+

@@ -10,7 +10,6 @@ class CreateGroup:
         self.bot = bot
         self.group_data = {}
         self.bot.callback_query_handler(func=lambda call:call.data in ['mon/wed/fri', 'tue/thu/sat', 'sat/sun'])(self.choose_day)
-        self.bot.callback_query_handler(func=lambda call:call.data.startswith('get_admin_'))(self.get_teacher)
         self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_create_group')(self.cancel_create)
 
     def cancel_create(self, call):
@@ -51,19 +50,15 @@ class CreateGroup:
 
         self.group_data[message.chat.id]['time'] = time_str
 
-        response = requests.get("http://127.0.0.1:8000/account/get_admins/", headers={"X-Telegram-Id":str(message.from_user.id)})
-        admins = response.json()
-        markup = types.InlineKeyboardMarkup()
-        for admin in admins:
-            markup.add(types.InlineKeyboardButton(f"{admin['last_name']} {admin['first_name']}", callback_data=f'get_admin_{admin['id']}'))
-        self.bot.send_message(message.chat.id, 'Укажите хореографа:', reply_markup=markup)
+        self.bot.send_message(message.chat.id, 'Введите имя учителя: ', reply_markup=self.cancel_markup())
+        self.bot.register_next_step_handler(message, self.get_teacher)
 
-    def get_teacher(self, call):
-        teacher = call.data.split('_')[2]
-        self.group_data[call.message.chat.id]['teacher'] = teacher
+    def get_teacher(self, message):
+        teacher = message.text.strip()
+        self.group_data[message.chat.id]['teacher'] = teacher
 
-        self.bot.send_message(call.message.chat.id, 'Введите возраст для группы: ', reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler(call.message, self.get_age)
+        self.bot.send_message(message.chat.id, 'Введите возраст для группы: ', reply_markup=self.cancel_markup())
+        self.bot.register_next_step_handler(message, self.get_age)
 
     def get_age(self, message):
         age = message.text.strip()
@@ -87,11 +82,11 @@ class CreateGroup:
             'age':self.group_data[call.message.chat.id]['age'],
             'days':days
         }
-    
+        show_days = {'mon/wed/fri':'Пн-Ср-Пт','tue/thu/sat':'Вт-Чт-Сб','sat/sun':'Сб-Вс'}.get(days)
         try:
             response = requests.post(f'{API_URL}create/', headers={'X-Telegram-Id':str(telegram_id)}, json=data)
             if response.status_code == 201:
-                self.bot.send_message(call.message.chat.id, f'Группа "{self.group_data[call.message.chat.id]['title']} {self.group_data[call.message.chat.id]['time']} {days}" создана. ✅')
+                self.bot.send_message(call.message.chat.id, f'Группа "{self.group_data[call.message.chat.id]['title']} {self.group_data[call.message.chat.id]['time']} {show_days}" создана. ✅')
             else:
                 self.bot.send_message(call.message.chat.id, f'Ошибка при создании: {response.status_code}\n{response.text}\n{call.message.text}')
             self.bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
@@ -196,8 +191,7 @@ class DetailGroup:
             time = response.json().get('time')
             days = response.json().get('days')
             amount = response.json().get('user_count')
-            teachers_first_name = response.json().get('teachers_first_name')
-            teachers_last_name = response.json().get('teachers_last_name')
+            teacher = response.json().get('teacher')
         else:
             self.bot.send_message(call.message.chat.id, f'Ошибка: {response.status_code} {response.text}')
             return
@@ -219,7 +213,7 @@ class DetailGroup:
         text = f"""
 <b>📌 Название группы:</b> {title}
 <b>⏰ Время:</b> {time[:5]}
-<b>👤 Хореограф:</b> {teachers_first_name} {teachers_last_name}
+<b>👤 Хореограф:</b> {teacher}
 <b>📅 Дни занятий:</b> {show_days}
 <b>👥 Количество учеников:</b> {amount}
 """
@@ -615,7 +609,8 @@ class UpdateGroup:
             self.bot.register_next_step_handler(call.message, self.get_time)
         elif call.data == 'edit_teacher':
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
-            self.get_teachers(call)
+            self.bot.send_message(call.message.chat.id, 'Введите нового учителя:')
+            self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, self.set_new_teacher)
         elif call.data.startswith('set_new_teacher_'):
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.set_new_teacher(call)
@@ -651,19 +646,10 @@ class UpdateGroup:
         self.edit_data[message.chat.id]['data']['time'] = time_str
         self.show_edit_menu(message.chat.id)
 
-    def get_teachers(self, call):
-        response = requests.get("http://127.0.0.1:8000/account/get_admins/", headers={"X-Telegram-Id":str(call.from_user.id)})
-        markup = types.InlineKeyboardMarkup()
-        admins = response.json()
-        for admin in admins:
-            print(admin)
-            markup.add(types.InlineKeyboardButton(f"{admin['last_name']} {admin['first_name']}", callback_data=f"set_new_teacher_{admin['id']}"))
-        self.bot.send_message(call.message.chat.id, 'Выберите учителя:', reply_markup=markup)
-
-    def set_new_teacher(self, call):
-        teacher_id = call.data.split('_')[3]
-        self.edit_data[call.message.chat.id]['data']['teacher'] = teacher_id
-        self.show_edit_menu(call.message.chat.id)
+    def set_new_teacher(self, message):
+        teacher = message.text.strip()
+        self.edit_data[message.chat.id]['data']['teacher'] = teacher
+        self.show_edit_menu(message.chat.id)
 
     def choose_days(self, call):
         markup = types.InlineKeyboardMarkup()
@@ -692,6 +678,9 @@ class UpdateGroup:
                 v_display = v
             elif k == 'time':
                 k_display = 'Время'
+                v_display = v
+            elif k == 'teacher':
+                k_display = 'Учитель'
                 v_display = v
             elif k == 'days':
                 k_display=k

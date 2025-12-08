@@ -136,7 +136,7 @@ def check_role(message):
 def admin(message):
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton('Группы', callback_data='groups'))
-    markup.add(types.InlineKeyboardButton('Абонементы', callback_data='subscriptions'))
+    # markup.add(types.InlineKeyboardButton('Абонементы', callback_data='subscriptions'))
     markup.add(types.InlineKeyboardButton('⬅️ Главное меню', callback_data='menu'))
 
     bot.send_message(message.chat.id,
@@ -149,7 +149,7 @@ def admin(message):
 def admin_panel(call):
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton('Группы', callback_data='groups'))
-    markup.add(types.InlineKeyboardButton('Абонементы', callback_data='subscriptions'))
+    # markup.add(types.InlineKeyboardButton('Абонементы', callback_data='subscriptions'))
     markup.add(types.InlineKeyboardButton('⬅️ Главное меню', callback_data='menu'))
 
 

@@ -226,7 +226,7 @@ class MyProfile:
     
     def edit_profile(self, call):
         if call.message.chat.id in self.edit_data:
-            self.bot.answer_callback_query(call.id, '⏳ Вы уже начали регистрацию')
+            self.bot.answer_callback_query(call.id, '⏳ Вы уже начали редактирование.')
             return
         
         user_id = call.data.strip('_')[-1]
@@ -264,6 +264,12 @@ class MyProfile:
     
         self.edit_data[message.chat.id]['phone'] = phone
 
+        self.bot.send_message(
+        message.chat.id,
+        "Обновляю данные...",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+
         data = {
             'id':self.edit_data[message.chat.id]['id'],
             'first_name':self.edit_data[message.chat.id]['first_name'],
@@ -272,7 +278,7 @@ class MyProfile:
         }
         response = requests.patch(f"{API_URL}update_user/", json=data, headers={"X-Telegram-Id":str(message.from_user.id)})
         if response.status_code == 200:
-            self.bot.send_message(message.chat.id, "✅ Профиль успешно обнавлен!", reply_markup=types.ReplyKeyboardRemove())
+            self.bot.send_message(message.chat.id, "✅ Профиль успешно обнавлен!")
             self.bot.send_message(message.chat.id, "/menu")
             self.edit_data.pop(message.chat.id)
         else:
