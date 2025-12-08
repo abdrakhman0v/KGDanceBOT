@@ -6,7 +6,7 @@ from apps.account.models import User
 from apps.group.models import Group
 
 class Subscription(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='subscriptions')
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='subscriptions')
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='subscriptions')
     start_date = models.DateField(default=timezone.now)
     end_date = models.DateField()

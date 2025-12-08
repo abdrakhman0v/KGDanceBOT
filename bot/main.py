@@ -3,7 +3,7 @@ from telebot import types
 import requests
 from decouple import config
 
-from bot.auth import Auth, ChildRegister
+from bot.auth import Auth, ChildRegister, MyProfile
 from bot.groups import CreateGroup, ListGroup, DetailGroup, DetailGroupUser, UpdateGroup, DeleteGroup
 from bot.subscriptions import SubscriptionHandler
 from .utils import show_menu
@@ -20,11 +20,16 @@ register_handler = Auth(bot)
 def authentication(message):
     register_handler.authentication(message)
     
-    
 child_register_handler = ChildRegister(bot)
 @bot.callback_query_handler(func=lambda call:call.data == 'register_child')
 def register_child_handler(call):
     child_register_handler.child_register(call)
+
+my_profile_handler = MyProfile(bot)
+@bot.callback_query_handler(func=lambda call:call.data == 'my_profile')
+def profile_handler(call):
+    my_profile_handler.show_my_profile(call)
+
 
 # ----------ГЛАВНОЕ МЕНЮ-----------
 @bot.message_handler(commands=['menu'])

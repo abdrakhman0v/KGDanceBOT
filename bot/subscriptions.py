@@ -268,7 +268,7 @@ class SubscriptionHandler:
                         
                         text += f" • {day.replace('-', '.')} {mark}\n"
                     text += "────────────────────\n\n"
-                markup.add(types.InlineKeyboardButton('⬅️Назад', callback_data='menu'))
+                markup.add(types.InlineKeyboardButton('⬅️ Главное меню', callback_data='menu'))
                 self.bot.edit_message_text(text=text,
                                            chat_id=call.message.chat.id,
                                            message_id=call.message.message_id,

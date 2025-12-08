@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.db.models import ProtectedError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
@@ -56,6 +57,14 @@ class GetChildsView(APIView):
         serializer = UserSerializer(children, many=True)
         return Response(serializer.data)
     
+class GetChildDataView(APIView):
+    authentication_classes = [TelegramAuthentication]
+
+    def get(self, request, pk):
+        child = User.objects.get(pk=pk)
+        serializer= UserSerializer(child)
+        return Response(serializer.data)
+    
 class GetUserByPhoneView(APIView):
     authentication_classes = [TelegramAuthentication]
 
@@ -72,7 +81,41 @@ class GetAdminsView(APIView):
         admins = User.objects.filter(role='admin')
         serializer = UserSerializer(admins, many=True)
         return Response(serializer.data, status=200)
+    
+class GetUsersDataView(APIView):
+    authentication_classes = [TelegramAuthentication]
 
+    def get(self, request):
+        tg_id = request.headers.get('X-Telegram-Id')
+        user = User.objects.get(telegram_id=tg_id)
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    
+class UpdateUserView(APIView):
+    authentication_classes = [TelegramAuthentication]
+
+    def patch(self, request):
+        id = request.data.get('id')
+        user = User.objects.get(id=id)
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=200)
+
+    
+class DeleteChildView(APIView):
+    authentication_classes = [TelegramAuthentication]
+
+    def delete(self, request, pk):
+        try:
+            child = User.objects.get(pk=pk)
+            child.delete()
+            return Response({"detail":"Ребенок успешно удален"}, status=200)
+        except ProtectedError:
+            return Response({"detail":"❌ Невозможно удалить ребенка: у него есть активные абонементы"}, status=400)
+            
+        
+    
 
 
 

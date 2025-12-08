@@ -80,7 +80,7 @@ class AddUserToGroup(APIView):
                          'group_time':f"{group.time}",
                          'group_days':f"{group.days}"}, status=200)
 
-class DeletUserFromGroup(APIView):
+class DeleteUserFromGroup(APIView):
     authentication_classes = [TelegramAuthentication]
     def patch(self, request):
         group_id = request.data.get('group_id')

@@ -61,6 +61,6 @@ class DeleteSubView(APIView):
     def delete(self, request, sub_id):
         sub = Subscription.objects.get(id=sub_id)
         sub.delete()
-        return Response({"detail":"Group deleted"})
+        return Response({"detail":"Subscription deleted"})
 
     
