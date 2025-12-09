@@ -217,7 +217,7 @@ class MyProfile:
         self.edit_data.pop(call.message.chat.id, None)
         self.child_data.pop(call.message.chat.id, None)
         self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
-        self.bot.send_message(call.message.chat.id, '❌ Редактирование отменено.')
+        self.bot.send_message(call.message.chat.id, '❌ Редактирование отменено.', reply_markup=types.ReplyKeyboardRemove())
 
     def cancel_markup(self):
         markup=types.InlineKeyboardMarkup()
@@ -278,7 +278,7 @@ class MyProfile:
         }
         response = requests.patch(f"{API_URL}update_user/", json=data, headers={"X-Telegram-Id":str(message.from_user.id)})
         if response.status_code == 200:
-            self.bot.send_message(message.chat.id, "✅ Профиль успешно обнавлен!")
+            self.bot.send_message(message.chat.id, "✅ Профиль успешно обновлен!")
             self.bot.send_message(message.chat.id, "/menu")
             self.edit_data.pop(message.chat.id)
         else:
@@ -359,7 +359,7 @@ class MyProfile:
             types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'delete_child_{child_id}'),
             types.InlineKeyboardButton("❌ Отмена", callback_data=f'my_child_detail_{child_id}_{user_id}'),
             )
-        markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data=f'my_child_detail_{child_id}_{user_id}'))
+        markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data=f'my_childs_profile_{user_id}'))
         self.bot.edit_message_text("Вы уверены что хотите удалить ребенка?",
                                    call.message.chat.id,
                                    call.message.message_id,
@@ -370,7 +370,7 @@ class MyProfile:
         chat_id = call.message.chat.id
         response = requests.delete(f"{API_URL}delete_child/{id}/", headers={"X-Telegram-Id":str(call.from_user.id)})
         if response.status_code in [200, 204]:
-            self.bot.send_message(chat_id, '✅ Ребенок удален успешно.')
+            self.bot.answer_callback_query(call.id, 'Ребенок удален.')
         elif response.status_code == 400:
             self.bot.send_message(chat_id, '❌ Невозможно удалить ребенка, у него есть активные абонементы.')
         else:

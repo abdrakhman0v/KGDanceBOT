@@ -252,9 +252,10 @@ class SubscriptionHandler:
                 for sub in subscriptions:
 
                     text += (
-        f"💃 <b>{sub['group_title']}</b> {sub['group_time'][:5]}\n"
-        f"📅 <b>{sub['start_date']}</b> — <b>{sub['end_date']}</b>\n"
-        f"📊 <i>Посещено:</i> {sub['used_lessons']} из {sub['total_lessons']} занятий\n"
+        f"<b>Ф.И.О: {sub['last_name']} {sub['first_name']}</b>\n"
+        f"<b>Группа: {sub['group_title']} {sub['group_time'][:5]}</b>\n"
+        f"<b>Дата: {sub['start_date']}</b> — <b>{sub['end_date']}</b>\n"
+        f"<i>Посещено:</i> {sub['used_lessons']} из {sub['total_lessons']} занятий\n"
         f"🗓 Даты занятий:\n")
                     attendance = sub['attendance']
                     
@@ -266,7 +267,7 @@ class SubscriptionHandler:
                                 mark = '✅'
                             else:
                                 mark = '❌'
-                        
+
                         text += f" • {day.replace('-', '.')} {mark}\n"
                     text += "────────────────────\n\n"
                 markup.add(types.InlineKeyboardButton('⬅️ Главное меню', callback_data='menu'))
@@ -305,9 +306,9 @@ class SubscriptionHandler:
                 text = "<b>Абонементы ваших детей:</b>\n\n"
                 for sub in subscriptions:
                     text += (
-        f"👶 <b>{sub['last_name']} {sub['first_name']}</b>\n"
-        f"💃 <b>{sub['group_title']}</b> {sub['group_time'][:5]}\n"
-        f"📅 <b>{sub['start_date']}</b> — <b>{sub['end_date']}</b>\n"
+        f"<b>Ф.И.О: {sub['last_name']} {sub['first_name']}</b>\n"
+        f"<b>Группа: {sub['group_title']}{sub['group_time'][:5]}</b>\n"
+        f"<b>Дата: {sub['start_date']}</b> — <b>{sub['end_date']}</b>\n"
         f"📊 <i>Посещено:</i> {sub['used_lessons']} из {sub['total_lessons']} занятий\n"
         f"🗓 Даты занятий:\n")
                     attendance = sub['attendance']

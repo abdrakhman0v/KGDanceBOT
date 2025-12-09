@@ -214,10 +214,11 @@ def start_update(call):
 @bot.callback_query_handler(func=lambda call:call.data.startswith('confirm_delete_group'))
 def confirm_delete_group(call):
     group_id = call.data.split('_')[3]
+    days = call.data.split('_')[4]
 
     markup = types.InlineKeyboardMarkup()
     markup.row(
-        types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'delete_group_{group_id}'),
+        types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'delete_group_{group_id}_{days}'),
         types.InlineKeyboardButton("❌ Отмена", callback_data=f'group_detail_{group_id}')
     )
     bot.edit_message_text(

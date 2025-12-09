@@ -196,8 +196,8 @@ class DetailGroup:
             self.bot.send_message(call.message.chat.id, f'Ошибка: {response.status_code} {response.text}')
             return
         
-        markup.add(types.InlineKeyboardButton("✏️ Редактировать группу", callback_data=f'edit_{group_id}'))
-        markup.add(types.InlineKeyboardButton("🗑 Удалить группу", callback_data=f'confirm_delete_group_{group_id}'))
+        markup.add(types.InlineKeyboardButton("✏️ Редактировать группу", callback_data=f'edit_{group_id}_{days}'))
+        markup.add(types.InlineKeyboardButton("🗑 Удалить группу", callback_data=f'confirm_delete_group_{group_id}_{days}'))
 
         if days == 'mon/wed/fri':
             markup.add(types.InlineKeyboardButton('⬅️ Назад', callback_data='mon_wed_fri'))
@@ -583,9 +583,11 @@ class UpdateGroup:
         self.bot.callback_query_handler(func=lambda call: call.data in ['edit_title', 'edit_time', 'edit_teacher','edit_days', 'save_changes', 'cancel_edit'])(self.callback_handler)
         self.bot.callback_query_handler(func=lambda call: call.data.startswith('set_new_teacher_'))(self.callback_handler)
         self.bot.callback_query_handler(func=lambda call: call.data.startswith('set_new_days_'))(self.callback_handler)
+
     def start_update(self, call):
         group_id = call.data.split('_')[1]
-        self.edit_data[call.message.chat.id] = {'group_id':group_id, 'telegram_id':call.from_user.id,'data': {}}
+        days = call.data.split('_')[2]
+        self.edit_data[call.message.chat.id] = {'group_id':group_id, 'telegram_id':call.from_user.id,'show_days':days ,'data': {}}
         self.show_edit_menu(call.message.chat.id)
 
     def show_edit_menu(self, chat_id):
@@ -683,16 +685,13 @@ class UpdateGroup:
                 k_display = 'Учитель'
                 v_display = v
             elif k == 'days':
-                k_display=k
+                k_display= 'Дни'
                 v_display = {'mon/wed/fri':'Пн-Ср-Пт','tue/thu/sat':'Вт-Чт-Сб','sat/sun':'Сб-Вс'}.get(v)
             else:
                 k_display = k
                 v_display = v
             changes.append(f"{k_display} : {v_display}")
         self.bot.send_message(chat_id, "Сохраняем изменения:\n" + "\n".join(changes))
-
-        get_days = requests.get(f'{API_URL}detail/{group_id}/', headers={'X-Telegram-Id':str(telegram_id)})
-        days = get_days.json().get('days')
 
         try:
             response = requests.patch(
@@ -704,6 +703,8 @@ class UpdateGroup:
                                       f'Группа изменена. ✅ ')
             else:
                 self.bot.send_message(message.chat.id, f'Ошибка при редактировании: {response.status_code} {response.text}')
+
+            days = self.edit_data[message.chat.id]['show_days']
 
             from bot.main import list_group_handler
             if days == 'mon/wed/fri':
@@ -728,9 +729,7 @@ class DeleteGroup:
     def delete(self, call):
         telegram_id = call.from_user.id
         group_id = call.data.split('_')[2]
-        
-        # get_days = requests.get(f'{API_URL}detail/{group_id}/', headers={'X-Telegram-Id':str(telegram_id)})
-        # days = get_days.json().get('days')
+        days = call.data.split('_')[3]
 
         response = requests.delete(f'{API_URL}delete/{group_id}/', headers={'X-Telegram-Id':str(telegram_id)})
 
@@ -741,11 +740,11 @@ class DeleteGroup:
         else:
             self.bot.send_message(call.message.chat.id, f'Ошибка при удалении: {response.status_code} {response.text}')
             
-        # from bot.main import list_group_handler
-        # if days == 'mon/wed/fri':
-        #     list_group_handler.groups_list_mon(call.message.chat.id, telegram_id, call.message.message_id)
-        # elif days == 'tue/thu/sat':
-        #     list_group_handler.groups_list_tue(call.message.chat.id, telegram_id, call.message.message_id)
-        # elif days == 'sat/sun':
-        #     list_group_handler.groups_list_sun(call.message.chat.id, telegram_id, call.message.message_id)
+        from bot.main import list_group_handler
+        if days == 'mon/wed/fri':
+            list_group_handler.groups_list_mon(call.message.chat.id, telegram_id, call.message.message_id)
+        elif days == 'tue/thu/sat':
+            list_group_handler.groups_list_tue(call.message.chat.id, telegram_id, call.message.message_id)
+        elif days == 'sat/sun':
+            list_group_handler.groups_list_sun(call.message.chat.id, telegram_id, call.message.message_id)
 
