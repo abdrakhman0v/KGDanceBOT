@@ -9,5 +9,5 @@ urlpatterns = [
     path('delete/<int:pk>/', GroupDeleteAPIView.as_view()),
     path('get_group_users/<int:group_id>/', GetGroupUsersView.as_view()),
     path('add_user/', AddUserToGroup.as_view()),
-    path('delete_user/', DeleteUserFromGroup.as_view())
+    path('delete_user_from_group/', DeleteUserFromGroup.as_view())
 ]

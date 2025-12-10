@@ -50,7 +50,7 @@ class CreateGroup:
 
         self.group_data[message.chat.id]['time'] = time_str
 
-        self.bot.send_message(message.chat.id, 'Введите имя учителя: ', reply_markup=self.cancel_markup())
+        self.bot.send_message(message.chat.id, 'Введите имя хореографа/тренера: ', reply_markup=self.cancel_markup())
         self.bot.register_next_step_handler(message, self.get_teacher)
 
     def get_teacher(self, message):
@@ -423,7 +423,7 @@ class DetailGroupUser:
                      return
                 
                 active_text = "<b>Активные абонементы:</b>\n\n"
-                inactive_text = "<b>Неактивные абонементы:</b>\n\n"
+                # inactive_text = "<b>Неактивные абонементы:</b>\n\n"
                 for sub in subscriptions:
                     if sub['group'] == int(group_id):
                         active_text += (
@@ -563,9 +563,9 @@ class DetailGroupUser:
             'group_id':group_id
         }
         try:
-            response = requests.patch(f"{API_URL}delete_user/", json=data, headers={"X-Telegram-Id":str(call.from_user.id)})
+            response = requests.patch(f"{API_URL}delete_user_from_group/", json=data, headers={"X-Telegram-Id":str(call.from_user.id)})
             if response.status_code == 200:
-                self.bot.answer_callback_query(call.id, 'Пользователь успешно удален.')
+                self.bot.answer_callback_query(call.id, 'Пользователь удален из группы.')
             else:
                 self.bot.send_message(call.message.chat.id, f'Ошибка при удалении юзера: {response.status_code} {response.text}')
         except Exception as e:
@@ -578,7 +578,7 @@ class UpdateGroup:
     def __init__(self, bot):
         self.bot = bot
         self.edit_data = {}
-        self.bot.callback_query_handler(func=lambda call: call.data in ['edit_title', 'edit_time', 'edit_teacher','edit_days', 'save_changes', 'cancel_edit'])(self.callback_handler)
+        self.bot.callback_query_handler(func=lambda call: call.data in ['edit_title', 'edit_time', 'edit_age','edit_teacher','edit_days', 'save_changes', 'cancel_edit'])(self.callback_handler)
         self.bot.callback_query_handler(func=lambda call: call.data.startswith('set_new_teacher_'))(self.callback_handler)
         self.bot.callback_query_handler(func=lambda call: call.data.startswith('set_new_days_'))(self.callback_handler)
 
@@ -592,7 +592,8 @@ class UpdateGroup:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("✏️ Изменить название", callback_data='edit_title'))
         markup.add(types.InlineKeyboardButton("⏰ Изменить время", callback_data='edit_time'))
-        markup.add(types.InlineKeyboardButton("👤 Изменить учителя", callback_data='edit_teacher'))
+        markup.add(types.InlineKeyboardButton("🔢 Изменить категорию возраста", callback_data='edit_age'))
+        markup.add(types.InlineKeyboardButton("👤 Изменить хореографа/тренера", callback_data='edit_teacher'))
         markup.add(types.InlineKeyboardButton("📅 Изменить дни", callback_data='edit_days'))
         markup.add(types.InlineKeyboardButton("✅ Сохранить изменения", callback_data='save_changes'))
         markup.add(types.InlineKeyboardButton("❌ Отменить", callback_data='cancel_edit'))
@@ -607,13 +608,14 @@ class UpdateGroup:
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.bot.send_message(call.message.chat.id, 'Введите новое время группы:')
             self.bot.register_next_step_handler(call.message, self.get_time)
+        elif call.data == 'edit_age':
+            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
+            self.bot.send_message(call.message.chat.id, 'Введите новую категорию возраста группы:')
+            self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, self.get_age)
         elif call.data == 'edit_teacher':
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
-            self.bot.send_message(call.message.chat.id, 'Введите нового учителя:')
+            self.bot.send_message(call.message.chat.id, 'Введите нового хореографа/тренера:')
             self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, self.set_new_teacher)
-        elif call.data.startswith('set_new_teacher_'):
-            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
-            self.set_new_teacher(call)
         elif call.data == 'edit_days':
             self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
             self.choose_days(call)
@@ -644,6 +646,11 @@ class UpdateGroup:
             return
 
         self.edit_data[message.chat.id]['data']['time'] = time_str
+        self.show_edit_menu(message.chat.id)
+
+    def get_age(self, message):
+        age = message.text.strip()
+        self.edit_data[message.chat.id]['data']['age'] = age
         self.show_edit_menu(message.chat.id)
 
     def set_new_teacher(self, message):
@@ -678,6 +685,9 @@ class UpdateGroup:
                 v_display = v
             elif k == 'time':
                 k_display = 'Время'
+                v_display = v
+            elif k == 'age':
+                k_display = 'Категория возраста'
                 v_display = v
             elif k == 'teacher':
                 k_display = 'Хореограф/Тренер'
