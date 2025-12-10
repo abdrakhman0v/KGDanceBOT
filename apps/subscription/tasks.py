@@ -7,25 +7,24 @@ from .models import Subscription
 bot = TeleBot(config('TG_TOKEN'))
 
 @shared_task
-def check_subscription_expiry(sub_id):
+def check_subscription_expiry(sub_id, date, status):
     sub = Subscription.objects.get(id=sub_id)
     lessons_left = sub.total_lessons - len(sub.attendance)
     time_str = sub.group.time.strftime("%H:%M") if sub.group.time else ""
-    last_date = list(sub.attendance.keys())[-1]
-    last_mark = sub.attendance[last_date]
-    mark = '✅' if last_mark else '❌'
+    booled_status = bool(status)
+    mark = '✅' if booled_status else '❌'
     try:
         if lessons_left == 2:
             bot.send_message(sub.user.telegram_id,
                          f"Группа: {sub.group.title} {time_str}\n"
-                         f"Отметка за {last_date}: {mark}\n"
+                         f"Отметка за {date}: {mark}\n"
                          f"Осталось {len(sub.attendance)}/{sub.total_lessons} занятий.\n"
                          "⚠️ У вас осталось 2 занятия. Абонемент скоро закончится.")
         elif lessons_left == 1:
             bot.send_message(
             sub.user.telegram_id,
             f"Группа: {sub.group.title} {time_str}\n"
-            f"Отметка за {last_date}: {mark}\n"
+            f"Отметка за {date}: {mark}\n"
             f"Осталось {len(sub.attendance)}/{sub.total_lessons} занятий.\n"
             "❗ У вас осталось последнее занятие. "
             "Пора приобрести новый абонемент!"
@@ -36,14 +35,14 @@ def check_subscription_expiry(sub_id):
         else:
             bot.send_message(sub.user.telegram_id,
                          f"Группа: {sub.group.title} {time_str}\n"
-                         f"Отметка за {last_date}: {mark}\n"
+                         f"Отметка за {date}: {mark}\n"
                          f"Осталось {len(sub.attendance)}/{sub.total_lessons} занятий.")
     except ApiTelegramException:
         if lessons_left == 2:
             bot.send_message(sub.user.parent.telegram_id,
                          f"Группа: {sub.group.title} {time_str}\n"
                          f"Ребенок: {sub.user.last_name} {sub.user.first_name}\n"
-                         f"Отметка за {last_date}: {mark}\n"
+                         f"Отметка за {date}: {mark}\n"
                          f"Осталось {len(sub.attendance)}/{sub.total_lessons} занятий.\n"
                          "⚠️ У вас осталось 2 занятия. Абонемент скоро закончится.")
         elif lessons_left == 1:
@@ -51,7 +50,7 @@ def check_subscription_expiry(sub_id):
             sub.user.parent.telegram_id,
             f"Группа: {sub.group.title} {time_str}\n"
             f"Ребенок: {sub.user.last_name} {sub.user.first_name}\n"
-            f"Отметка за {last_date}: {mark}\n"
+            f"Отметка за {date}: {mark}\n"
             f"Осталось {len(sub.attendance)}/{sub.total_lessons} занятий.\n"
             "❗ У вас осталось последнее занятие. "
             "Пора приобрести новый абонемент!"
@@ -63,7 +62,7 @@ def check_subscription_expiry(sub_id):
             bot.send_message(sub.user.parent.telegram_id, 
                          f"Группа: {sub.group.title} {time_str}\n"
                          f"Ребенок: {sub.user.last_name} {sub.user.first_name}\n"
-                         f"Отметка за {last_date}: {mark}\n"
+                         f"Отметка за {date}: {mark}\n"
                          f"Осталось {len(sub.attendance)}/{sub.total_lessons} занятий.") 
         
 @shared_task

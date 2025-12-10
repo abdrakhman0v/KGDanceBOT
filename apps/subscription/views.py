@@ -53,7 +53,7 @@ class MarkAttendance(APIView):
 
         sub.used_lessons = sum(1 for s in attendance.values() if s)
         sub.save()
-        check_subscription_expiry.delay(sub.id)
+        check_subscription_expiry.delay(sub.id, date, status)
         return Response({'message': 'Attendance updated', 'attendance': sub.attendance, 'total_lessons':sub.total_lessons})
 
 class DeleteSubView(APIView):

@@ -24,7 +24,7 @@ class CreateGroup:
 
     def create_group(self, call):
         if call.message.chat.id in self.group_data:
-            self.bot.answer_callback_query(call.id, "⏳ Начните заново.")
+            self.bot.answer_callback_query(call.id, "⏳ Вы уже начали создание.")
             return
         self.group_data[call.message.chat.id] = {}
 
@@ -35,7 +35,7 @@ class CreateGroup:
         title = message.text.strip()
         self.group_data[message.chat.id]['title'] = title
 
-        self.bot.send_message(message.chat.id, 'Введите время группы: ', reply_markup=self.cancel_markup())
+        self.bot.send_message(message.chat.id, 'Введите время группы: ')
         self.bot.register_next_step_handler(message, self.get_time)
     
     def get_time(self, message):
@@ -68,6 +68,7 @@ class CreateGroup:
         markup.add(types.InlineKeyboardButton('пн/ср/пт', callback_data='mon/wed/fri'))
         markup.add(types.InlineKeyboardButton('вт/чт/сб', callback_data='tue/thu/sat'))
         markup.add(types.InlineKeyboardButton('сб/вс', callback_data='sat/sun'))
+        markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_group'))
         self.bot.send_message(message.chat.id, 'Выберите дни: ', reply_markup=markup)
 
 
@@ -213,7 +214,7 @@ class DetailGroup:
         text = f"""
 <b>📌 Название группы:</b> {title}
 <b>⏰ Время:</b> {time[:5]}
-<b>👤 Хореограф:</b> {teacher}
+<b>👤 Хореограф/Тренер:</b> {teacher}
 <b>📅 Дни занятий:</b> {show_days}
 <b>👥 Количество учеников:</b> {amount}
 """
@@ -262,6 +263,10 @@ class DetailGroup:
     #     return markup
     
     def find_user(self, call):
+        # if call.message.chat.id in self.user_to_add:
+        #     self.bot.answer_callback_query(call.id, '⏳ Вы уже начали добавление.')
+        #     return
+        
         self.user_to_add[call.message.chat.id] = {}
         self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона(+996): ')
         self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, 
@@ -542,6 +547,8 @@ class DetailGroupUser:
                    types.InlineKeyboardButton('Удалить', callback_data=f'confirm_delete_user_{telegram_id}_{group_id}'),
                    types.InlineKeyboardButton('Отмена', callback_data=f'group_user_{telegram_id}_{group_id}')
                    )
+        markup.add(types.InlineKeyboardButton('⬅️ Назад', callback_data=f'users_list_{group_id}'))
+
         self.bot.edit_message_text(text='Вы уверены, что хотите удалить пользователя из группы?',
                                    chat_id=call.message.chat.id,
                                    message_id=call.message.message_id,
@@ -557,19 +564,10 @@ class DetailGroupUser:
         }
         try:
             response = requests.patch(f"{API_URL}delete_user/", json=data, headers={"X-Telegram-Id":str(call.from_user.id)})
-            days = response.json().get('group_days')
             if response.status_code == 200:
                 self.bot.answer_callback_query(call.id, 'Пользователь успешно удален.')
             else:
                 self.bot.send_message(call.message.chat.id, f'Ошибка при удалении юзера: {response.status_code} {response.text}')
-
-            from bot.main import list_group_handler
-            if days == 'mon/wed/fri':
-                list_group_handler.groups_list_mon(call.message.chat.id, call.from_user.id, call.message.message_id)
-            elif days == 'tue/thu/sat':
-                list_group_handler.groups_list_tue(call.message.chat.id, call.from_user.id, call.message.message_id)
-            elif days == 'sat/sun':
-                list_group_handler.groups_list_sun(call.message.chat.id, call.from_user.id, call.message.message_id)
         except Exception as e:
             self.bot.send_message(call.message.chat.id, f'Ошибка: {e}')
 
@@ -682,7 +680,7 @@ class UpdateGroup:
                 k_display = 'Время'
                 v_display = v
             elif k == 'teacher':
-                k_display = 'Учитель'
+                k_display = 'Хореограф/Тренер'
                 v_display = v
             elif k == 'days':
                 k_display= 'Дни'
