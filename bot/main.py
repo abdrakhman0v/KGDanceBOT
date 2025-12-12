@@ -9,8 +9,11 @@ from bot.subscriptions import SubscriptionHandler
 from .utils import show_menu
 
 TOKEN = config('TG_TOKEN')
+
 bot = telebot.TeleBot(TOKEN)
+
 API_URL = 'http://127.0.0.1:8000/'
+
 WEBHOOK_URL = 'https://lena-nonmetalliferous-pura.ngrok-free.dev/webhook/'
 
 requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}",)

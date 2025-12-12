@@ -9,6 +9,8 @@ from .models import Subscription
 from .serializers import SubscriptionSerializer
 from .tasks import check_subscription_expiry, created_notification, deleted_notification
 
+from datetime import timedelta
+
     
 class CreateSubView(APIView):
     authentication_classes = [TelegramAuthentication]
@@ -48,10 +50,36 @@ class MarkAttendance(APIView):
         status = request.data.get('status')
 
         attendance = sub.attendance or {}
-        attendance[date] = bool(status)
+        if status == '1':
+            status = 1
+        elif status == '0':
+            status = 0
+        else:
+            status == 'cancel'
+            day_map = {
+                'mon':0,
+                'tue':1,
+                'wed':2,
+                'thu':3,
+                'fri':4,
+                'sat':5,
+                'sun':6
+            }
+            active_days = [day_map[d] for d in sub.group.days.split('/')]
+            while True:
+                if date in sub.attendance:
+                    break
+                next_date = sub.end_date + timedelta(days=1)
+                if next_date.weekday() in active_days:
+                    sub.lesson_dates.append(next_date.strftime("%d-%m-%Y"))
+                    sub.end_date = next_date.strftime("%Y-%m-%d")
+                    break
+                sub.end_date = next_date
+                
+        attendance[date] = status
         sub.attendance = attendance
 
-        sub.used_lessons = sum(1 for s in attendance.values() if s)
+        sub.used_lessons = sum(1 for s in attendance.values() if s == 1)
         sub.save()
         check_subscription_expiry.delay(sub.id, date, status)
         return Response({'message': 'Attendance updated', 'attendance': sub.attendance, 'total_lessons':sub.total_lessons})

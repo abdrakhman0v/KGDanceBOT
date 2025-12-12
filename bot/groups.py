@@ -4,7 +4,6 @@ from datetime import datetime
 
 API_URL = "http://127.0.0.1:8000/group/"
 
-# to-do добавить функции отмены добавления
 class CreateGroup:
     def __init__(self, bot):
         self.bot = bot
@@ -320,6 +319,7 @@ class DetailGroup:
                                 "📌 <b>Информация о ребенке:</b>\n\n"
                                 f"👶 Имя: <b>{child['first_name']}</b>\n"
                                 f"👶 Фамилия: <b>{child['last_name']}</b>\n"
+                                f"👤 Родитель: <b>{child['parent_name']} {child['parent_last_name']}</b>"
                             )
                             markup_for_childs.add(types.InlineKeyboardButton("Добавить ребенка", 
                                                                              callback_data=f"confirm_add_client_{child['id']}"))
@@ -427,21 +427,22 @@ class DetailGroupUser:
                 for sub in subscriptions:
                     if sub['group'] == int(group_id):
                         active_text += (
-                        f" <b>{sub['last_name']}</b> <b>{sub['first_name']}</b>\n"
-                        f"💃 <b>{sub['group_title']}</b> {sub['group_time'][:5]}\n"
-                        f"📅 <b>{sub['start_date']}</b> — <b>{sub['end_date']}</b>\n"
-                        f"📊 <i>Посещено:</i> {sub['used_lessons']} из {sub['total_lessons']} занятий\n"
-                        f"────────────────────\n"
-                        )    
+                        f"<b>Ф.И.О: {sub['last_name']} {sub['first_name']}</b>\n"
+                        f"<b>Группа: {sub['group_title']} {sub['group_time'][:5]}</b>\n"
+                        f"<b>Дата: {sub['start_date']}</b> — <b>{sub['end_date']}</b>\n"
+                        f"<i>Посещено:</i> {sub['used_lessons']} из {sub['total_lessons']} занятий\n"
+                        f"🗓 Даты занятий:\n")
                         attendance = sub['attendance'] 
 
                         for day in sub['lesson_dates']:
                             mark = ''
                             if day in attendance:
-                                if attendance[day] == True:
+                                if attendance[day] == 1:
                                     mark = "✅"
-                                else:
+                                elif attendance[day] == 0:
                                     mark = "❌"
+                                else:
+                                    mark = "Отмена"
 
                             markup.add(types.InlineKeyboardButton(f'📅 {day.replace('-', '.')[:5]} {mark}', callback_data=f'mark_attendance_{sub['id']}_{day}_{telegram_id}_{group_id}'))
                         markup.add(types.InlineKeyboardButton('Удалить абонемент', callback_data=f'confirm_delete_sub_{sub['id']}_{telegram_id}_{group_id}'))
@@ -508,6 +509,7 @@ class DetailGroupUser:
             types.InlineKeyboardButton('✅', callback_data=f'set_attendance_1_{sub_id}_{date}_{telegram_id}_{group_id}'),
             types.InlineKeyboardButton('❌', callback_data=f'set_attendance_0_{sub_id}_{date}_{telegram_id}_{group_id}')
         )
+        markup.add(types.InlineKeyboardButton('Отмена занятия', callback_data=f'set_attendance_cancel_{sub_id}_{date}_{telegram_id}_{group_id}'))
         markup.add(types.InlineKeyboardButton('⬅️ Назад', callback_data=f'group_user_{telegram_id}_{group_id}'))
 
         self.bot.edit_message_text(
@@ -519,7 +521,7 @@ class DetailGroupUser:
         )
 
     def set_attendance(self, call):
-        status = int(call.data.split('_')[2])
+        status = call.data.split('_')[2]
         sub_id = call.data.split('_')[3]
         date = call.data.split('_')[4]
         telegram_id = call.data.split('_')[5]
@@ -532,7 +534,7 @@ class DetailGroupUser:
 
         response = requests.patch(f"http://127.0.0.1:8000/subscription/mark_attendance/{sub_id}/", json=data, headers={'X-Telegram-Id':str(call.from_user.id)})
         sub_data = response.json()
-        if len(sub_data['attendance']) == sub_data['total_lessons']:
+        if len(sub_data['']) == sub_data['total_lessons']:
             self.bot.answer_callback_query(call.id, 'Абонемент закончился.', show_alert=True)
 
         self.bot.answer_callback_query(call.id, 'Отмечено')
