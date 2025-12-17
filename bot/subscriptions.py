@@ -39,8 +39,6 @@ class SubscriptionHandler:
          markup = types.InlineKeyboardMarkup()
          markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_sub'))
          return markup
-    
-# to-do получить total_lessons автоматически
 
     def create_sub(self, call):
         if call.message.chat.id in self.sub_data:
@@ -75,145 +73,128 @@ class SubscriptionHandler:
     def calendar_handler(self, call):
         name, action, year, month, day = call.data.split(self.calendar_callback.sep)
         date = self.calendar.calendar_query_handler(bot=self.bot, call=call, name=name, action=action, year=year, month=month, day=day)
-        
+        chat_id = call.message.chat.id
+        telegram_id = self.sub_data[chat_id]['telegram_id']
+        group_id = self.sub_data[chat_id]['group_id']
+
         if action == 'DAY':
 
             if 'start_date' not in self.sub_data.get(call.message.chat.id):
                 self.sub_data[call.message.chat.id]['start_date'] = date.strftime('%Y-%m-%d')
                 self.bot.send_message(call.message.chat.id, f"✅ Дата выбрана: {date.strftime('%d-%m-%Y')}")
 
-                today = datetime.now()
-                markup = self.calendar.create_calendar(
-                    name=self.calendar_callback.prefix,
-                    year = today.year,
-                    month = today.month
-                )
-                markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_sub'))
+                group_response = requests.get(f"http://127.0.0.1:8000/group/detail/{group_id}/", headers={'X-Telegram-Id':str(call.from_user.id)})
+                days = group_response.json().get('days')
+                if days == 'sat/sun':
+                    total_lessons = 8
+                else:
+                    total_lessons = 12
 
-                self.bot.send_message(call.message.chat.id, '📅 Теперь выберите дату конца абонемента:', reply_markup=markup)
+                self.sub_data[chat_id]['total_lessons'] = total_lessons
 
-            else:
-
-                self.sub_data[call.message.chat.id]['end_date'] = date.strftime('%Y-%m-%d')
-                self.bot.send_message(call.message.chat.id, f"✅ Дата выбрана: {date.strftime('%d-%m-%Y')}")
+                day_map = {
+                    'mon':0,
+                    'tue':1,
+                    'wed':2,
+                    'thu':3,
+                    'fri':4,
+                    'sat':5,
+                    'sun':6
+                    }
                 
+                start_date = datetime.strptime(self.sub_data[chat_id]['start_date'], '%Y-%m-%d')
 
-                self.bot.send_message(call.message.chat.id, 'Введите количество занятий: ', reply_markup=self.cancel_markup())
-                self.bot.register_next_step_handler_by_chat_id(call.message.chat.id,
-                                                       callback=lambda msg: self.get_total_lessons(msg))
+                active_days = [day_map[d] for d in days.split('/')]
+
+                lesson_dates = []
+                
+                current_date = start_date
+                while len(lesson_dates) < total_lessons:
+                    if current_date.weekday() in active_days:
+                        lesson_dates.append(current_date.strftime('%d-%m-%Y'))
+                    current_date += timedelta(days=1)
+                end_date = datetime.strptime(lesson_dates[-1], '%d-%m-%Y')
+                self.sub_data[call.message.chat.id]['end_date'] = end_date.strftime('%Y-%m-%d')
+            
+                data = {
+                    'user':self.sub_data[chat_id]['telegram_id'],
+                    'group':self.sub_data[chat_id]['group_id'],
+                    'price':self.sub_data[chat_id]['price'],
+                    'start_date':self.sub_data[chat_id]['start_date'],
+                    'end_date':self.sub_data[chat_id]['end_date'],
+                    'total_lessons':self.sub_data[chat_id]['total_lessons'],
+                    'lesson_dates':lesson_dates
+                }
+
+                try:
+                    response = requests.post(f'{API_URL}create_subscription/', json=data, headers={'X-Telegram-Id':str(call.from_user.id)})
+                    if response.status_code in [200, 201]:
+                        sub = response.json()
+                        self.bot.send_message(chat_id,
+                                      "✅ Абонемент создан успешно!\n"
+                        f"👤 Клиент: {sub['first_name']} {sub['last_name']}\n"
+                        f"👥 Группа: {sub['group_title']} {sub['group_time'][:5]}\n"
+                        f"📅 Период: {sub['start_date']} - {sub['end_date']}\n"
+                        f"💰 Сумма: {sub['price']} сом\n"
+                        f"🏷 Кол-во занятий: {self.sub_data[chat_id]['total_lessons']}")
+
+                        from bot.main import list_group_handler
+                        if sub['group_days'] == 'mon/wed/fri':
+                            list_group_handler.groups_list_mon(chat_id, telegram_id, call.message.message_id)
+                        elif sub['group_days'] == 'tue/thu/sat':
+                            list_group_handler.groups_list_tue(chat_id, telegram_id, call.message.message_id)
+                        elif sub['group_days'] == 'sat/sun':
+                            list_group_handler.groups_list_sun(chat_id, telegram_id, call.message.message_id)
+                    else:
+                        self.bot.send_message(call.message.chat.id, f'Ошибка при создании: {response.status_code} {response.text}')
+
+                except Exception as e:
+                    self.bot.send_message(chat_id, f'Ошибка: {e}')
+                finally:
+                    self.sub_data.pop(chat_id)
+
         elif action == 'CANCEL':
             self.sub_data.pop(call.message.chat.id)
             self.bot.send_message(call.message.chat.id, "❌ Создание абонемента отменено.")
         
-    def get_total_lessons(self, message):
-        chat_id = message.chat.id
-        telegram_id = message.from_user.id
-        total_lessons = int(message.text.strip())
-
-        self.sub_data[message.chat.id]['total_lessons'] = total_lessons
-
-        start_date = datetime.strptime(self.sub_data[chat_id]['start_date'], '%Y-%m-%d')
-        end_date = datetime.strptime(self.sub_data[chat_id]['end_date'], '%Y-%m-%d')
-
-        group_id = self.sub_data[chat_id]['group_id']
-        group_response = requests.get(f"http://127.0.0.1:8000/group/detail/{group_id}/", headers={'X-Telegram-Id':str(telegram_id)})
-        days = group_response.json().get('days')
-        
-        day_map = {
-            'mon':0,
-            'tue':1,
-            'wed':2,
-            'thu':3,
-            'fri':4,
-            'sat':5,
-            'sun':6
-        }
-
-        active_days = [day_map[d] for d in days.split('/')]
-        
-        lesson_dates = []
-        current_date = start_date
-        while current_date <= end_date:
-            if current_date.weekday() in active_days:
-                lesson_dates.append(current_date.strftime('%d-%m-%Y'))
-            current_date += timedelta(days=1)
-
-        data = {
-                'user':self.sub_data[chat_id]['telegram_id'],
-                'group':self.sub_data[chat_id]['group_id'],
-                'price':self.sub_data[chat_id]['price'],
-                'start_date':self.sub_data[chat_id]['start_date'],
-                'end_date':self.sub_data[chat_id]['end_date'],
-                'total_lessons':self.sub_data[chat_id]['total_lessons'],
-                'lesson_dates':lesson_dates
-            }
-
-        try:
-            response = requests.post(f'{API_URL}create_subscription/', json=data, headers={'X-Telegram-Id':str(telegram_id)})
-            if response.status_code in [200, 201]:
-                sub = response.json()
-                self.bot.send_message(chat_id,
-                                      "✅ Абонемент создан успешно!\n"
-            f"👤 Клиент: {sub['first_name']} {sub['last_name']}\n"
-            f"👥 Группа: {sub['group_title']} {sub['group_time'][:5]}\n"
-            f"📅 Период: {sub['start_date']} - {sub['end_date']}\n"
-            f"💰 Сумма: {sub['price']} сом\n"
-            f"🏷 Кол-во занятий: {self.sub_data[message.chat.id]['total_lessons']}")
-            else:
-                self.bot.send_message(message.chat.id, f'Ошибка при создании: {response.status_code} {response.text}')
-
-            from bot.main import list_group_handler
-            if sub['group_days'] == 'mon/wed/fri':
-                list_group_handler.groups_list_mon(chat_id, telegram_id, message.message_id)
-            elif sub['group_days'] == 'tue/thu/sat':
-                list_group_handler.groups_list_tue(chat_id, telegram_id, message.message_id)
-            elif sub['group_days'] == 'sat/sun':
-                list_group_handler.groups_list_sun(chat_id, telegram_id, message.message_id)
-
-        except Exception as e:
-            self.bot.send_message(message.chat.id, f'Ошибка: {e}')
-        finally:
-            self.sub_data.pop(chat_id)
-
-
-    
     def update_sub(self, call):
-        sub_id = call.data.split('_')[2]
-        self.update_data[call.message.chat.id] = {'sub_id':sub_id}
+        ...
+        # sub_id = call.data.split('_')[2]
+        # self.update_data[call.message.chat.id] = {'sub_id':sub_id}
 
-        today = datetime.now()
-        markup = self.calendar.create_calendar(
-            name=self.calendar_callback.prefix,
-            year = today.year,
-            month = today.month
-        )
+        # today = datetime.now()
+        # markup = self.calendar.create_calendar(
+        #     name=self.calendar_callback.prefix,
+        #     year = today.year,
+        #     month = today.month
+        # )
 
-        self.bot.send_message(call.message.chat.id, '📅 Выберите дату начала абонемента:', reply_markup=markup)
+        # self.bot.send_message(call.message.chat.id, '📅 Выберите дату начала абонемента:', reply_markup=markup)
 
 
-        name, action, year, month, day = call.data.split(self.calendar_callback.sep)
-        date = self.calendar.calendar_query_handler(bot=self.bot, call=call, name=name, action=action, year=year, month=month, day=day)
+        # name, action, year, month, day = call.data.split(self.calendar_callback.sep)
+        # date = self.calendar.calendar_query_handler(bot=self.bot, call=call, name=name, action=action, year=year, month=month, day=day)
         
-        if action == 'DAY':
+        # if action == 'DAY':
 
-            if 'start_date' not in self.sub_data.get(call.message.chat.id):
-                self.update_data[call.message.chat.id]['start_date'] = date.strftime('%Y-%m-%d')
-                self.bot.send_message(call.message.chat.id, f"✅ Дата выбрана: {date.strftime('%d-%m-%Y')}")
+        #     if 'start_date' not in self.sub_data.get(call.message.chat.id):
+        #         self.update_data[call.message.chat.id]['start_date'] = date.strftime('%Y-%m-%d')
+        #         self.bot.send_message(call.message.chat.id, f"✅ Дата выбрана: {date.strftime('%d-%m-%Y')}")
 
-                today = datetime.now()
-                markup = self.calendar.create_calendar(
-                    name=self.calendar_callback.prefix,
-                    year = today.year,
-                    month = today.month
-                )
-                markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_sub'))
+        #         today = datetime.now()
+        #         markup = self.calendar.create_calendar(
+        #             name=self.calendar_callback.prefix,
+        #             year = today.year,
+        #             month = today.month
+        #         )
+        #         markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_sub'))
 
-                self.bot.send_message(call.message.chat.id, '📅 Теперь выберите дату конца абонемента:', reply_markup=markup)
+        #         self.bot.send_message(call.message.chat.id, '📅 Теперь выберите дату конца абонемента:', reply_markup=markup)
 
-            else:
+        #     else:
 
-                self.sub_data[call.message.chat.id]['end_date'] = date.strftime('%Y-%m-%d')
-                self.bot.send_message(call.message.chat.id, f"✅ Дата выбрана: {date.strftime('%d-%m-%Y')}")
+        #         self.sub_data[call.message.chat.id]['end_date'] = date.strftime('%Y-%m-%d')
+        #         self.bot.send_message(call.message.chat.id, f"✅ Дата выбрана: {date.strftime('%d-%m-%Y')}")
 
     def confirm_delete_sub(self, call):
         sub_id = call.data.split('_')[3]

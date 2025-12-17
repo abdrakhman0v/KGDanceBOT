@@ -24,9 +24,6 @@ def check_subscription_expiry(sub_id, date, status):
                 f"❗️Занятие отменено.\nДата: {date}\n"
                 f"Добавлена новая дата занятия {sub.end_date.strftime('%d-%m-%Y')}")
             bot.send_message(sub.user.telegram_id, text)
-            # sub.attendance.pop(date)
-            # sub.lesson_dates.remove(date)
-            # sub.save()
             return
     
         text =(
@@ -59,10 +56,6 @@ def check_subscription_expiry(sub_id, date, status):
                     f"❗️Занятие отменено. Дата: {date}"
                     f"Добавлена новая дата занятия {sub.end_date.strftime('%d-%m-%Y')}")
             bot.send_message(sub.user.parent.telegram_id, text, parse_mode="HTML")
-            # sub.attendance.pop(date)
-            # sub.lesson_dates.remove(date)
-            # sub.save()
-            # return
         
         text = (f"<b>Группа: {sub.group.title} {time_str}\n</b>"
                 f"<b>Ребенок: {sub.user.last_name} {sub.user.first_name}\n</b>"

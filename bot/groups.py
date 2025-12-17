@@ -56,7 +56,7 @@ class CreateGroup:
         teacher = message.text.strip()
         self.group_data[message.chat.id]['teacher'] = teacher
 
-        self.bot.send_message(message.chat.id, 'Введите возраст для группы: ', reply_markup=self.cancel_markup())
+        self.bot.send_message(message.chat.id, 'Введите категорию возраста для группы: ', reply_markup=self.cancel_markup())
         self.bot.register_next_step_handler(message, self.get_age)
 
     def get_age(self, message):
@@ -172,11 +172,13 @@ class DetailGroup:
         self.bot = bot
         self.group_id = {}
         self.user_to_add = {}
+        self.waiting_phone = set()
 
         self.bot.callback_query_handler(func=lambda call:call.data == 'add_client')(self.find_user)
+        self.bot.callback_query_handler(func=lambda call:call.data == 'retry_phone')(self.retry_phone)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('confirm_add_client_'))(self.add_client)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('users_list_'))(self.users_list)
-        # self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_add_client')(self.cancel_add_client)
+        self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_add_client')(self.cancel_add_client)
     
 
     def detail_group(self, call):
@@ -250,34 +252,53 @@ class DetailGroup:
         
 # -------------------ДОБАВЛЕНИЕ КЛИЕНТА В ГРУППУ----------------------------------
         
-    # def cancel_add_client(self, call):
-    #     chat_id = call.message.chat.id
-    #     self.user_to_add.pop(chat_id)
-    #     self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)
-    #     self.bot.send_message(chat_id, '❌ Добавление пользователя отменено.')
+    def cancel_add_client(self, call):
+        chat_id = call.message.chat.id
+        self.user_to_add.pop(chat_id, None)
+        self.waiting_phone.discard(chat_id)
+        self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)
+        self.bot.send_message(chat_id, '❌ Добавление пользователя отменено.')
     
-    # def cancel_markup(self):
-    #     markup = types.InlineKeyboardMarkup()
-    #     markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
-    #     return markup
+    def cancel_markup(self):
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
+        return markup
     
     def find_user(self, call):
-        # if call.message.chat.id in self.user_to_add:
-        #     self.bot.answer_callback_query(call.id, '⏳ Вы уже начали добавление.')
-        #     return
+        if call.message.chat.id in self.waiting_phone:
+            self.bot.answer_callback_query(call.id, '⏳ Вы уже начали поиск.')
+            return
         
         self.user_to_add[call.message.chat.id] = {}
-        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона(+996): ')
+        self.waiting_phone.add(call.message.chat.id)
+        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона клиента(+996): ', reply_markup=self.cancel_markup())
+        self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, 
+                                                       callback=lambda message: self.get_phone(message)
+                                                       )
+
+    def retry_phone(self, call):
+        if call.message.chat.id in self.waiting_phone:
+            self.bot.answer_callback_query(call.id, '⏳ Вы уже начали поиск.')
+            return
+        
+        self.waiting_phone.add(call.message.chat.id) 
+        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона клиента(+996): ', reply_markup=self.cancel_markup())
         self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, 
                                                        callback=lambda message: self.get_phone(message)
                                                        )
         
     def get_phone(self, message):
+        if message.chat.id not in self.waiting_phone:
+            return
+        
+        self.waiting_phone.discard(message.chat.id)
+
         phone = message.text.strip()
 
         if phone.startswith('9'):
             phone = '+' + phone 
         if not phone or not phone.startswith("+") or not phone[1:].isdigit():
+            self.waiting_phone.add(message.chat.id)
             self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ')
             self.bot.register_next_step_handler(message, lambda msg: self.get_phone(msg))
             return
@@ -296,9 +317,9 @@ class DetailGroup:
                     markup = types.InlineKeyboardMarkup()
                     markup.row(
                         types.InlineKeyboardButton('Добавить', callback_data=f'confirm_add_client_{user_id}'),
-                        types.InlineKeyboardButton('Ввести номер заново', callback_data='add_client')
+                        types.InlineKeyboardButton('Ввести номер заново', callback_data='retry_phone')
                         )
-                    # markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
+                    markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
 
                     parent_text = (
                     "📌 <b>Информация о клиенте:</b>\n\n"
@@ -332,9 +353,9 @@ class DetailGroup:
                     markup = types.InlineKeyboardMarkup()
                     markup.row(
                         types.InlineKeyboardButton('Добавить', callback_data=f'confirm_add_client_{user_id}'),
-                        types.InlineKeyboardButton('Ввести номер заново', callback_data='add_client')
+                        types.InlineKeyboardButton('Ввести номер заново', callback_data='retry_phone')
                         )
-                    # markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
+                    markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
                     text = (
                     "📌 <b>Информация о клиенте:</b>\n\n"
                     f"👤 Имя: <b>{first_name}</b>\n"
