@@ -43,6 +43,10 @@ class SubscriptionHandler:
 # to-do получить total_lessons автоматически
 
     def create_sub(self, call):
+        if call.message.chat.id in self.sub_data:
+            self.bot.answer_callback_query(call.id, '⏳ Вы уже начали создание абонемента')
+            return
+        
         telegram_id = call.data.split('_')[2]
         group_id = call.data.split('_')[3]
 
@@ -97,6 +101,9 @@ class SubscriptionHandler:
                 self.bot.send_message(call.message.chat.id, 'Введите количество занятий: ', reply_markup=self.cancel_markup())
                 self.bot.register_next_step_handler_by_chat_id(call.message.chat.id,
                                                        callback=lambda msg: self.get_total_lessons(msg))
+        elif action == 'CANCEL':
+            self.sub_data.pop(call.message.chat.id)
+            self.bot.send_message(call.message.chat.id, "❌ Создание абонемента отменено.")
         
     def get_total_lessons(self, message):
         chat_id = message.chat.id
@@ -166,7 +173,7 @@ class SubscriptionHandler:
         except Exception as e:
             self.bot.send_message(message.chat.id, f'Ошибка: {e}')
         finally:
-            self.sub_data.pop
+            self.sub_data.pop(chat_id)
 
 
     

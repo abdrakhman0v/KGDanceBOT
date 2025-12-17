@@ -50,13 +50,8 @@ class MarkAttendance(APIView):
         status = request.data.get('status')
 
         attendance = sub.attendance or {}
-        if status == '1':
-            status = 1
-        elif status == '0':
-            status = 0
-        else:
-            status == 'cancel'
-            day_map = {
+
+        day_map = {
                 'mon':0,
                 'tue':1,
                 'wed':2,
@@ -65,17 +60,33 @@ class MarkAttendance(APIView):
                 'sat':5,
                 'sun':6
             }
-            active_days = [day_map[d] for d in sub.group.days.split('/')]
+        active_days = [day_map[d] for d in sub.group.days.split('/')]
+        
+        if status == '1':
+            status = 1
+        elif status == '0':
+            status = 0
+        else:
+            status == 'cancel'
+
+            if sub.attendance.get(date) == 'cancel':
+                    return Response({"detail":"Этот день уже отменен."}, status=400)
+            
             while True:
-                if date in sub.attendance:
-                    break
                 next_date = sub.end_date + timedelta(days=1)
                 if next_date.weekday() in active_days:
                     sub.lesson_dates.append(next_date.strftime("%d-%m-%Y"))
                     sub.end_date = next_date.strftime("%Y-%m-%d")
                     break
                 sub.end_date = next_date
-                
+
+        if date in sub.attendance and sub.attendance.get(date) == 'cancel':
+            sub.lesson_dates.pop(-1)
+            prev_date = sub.end_date - timedelta(days=1)
+            while prev_date.weekday() not in active_days:
+                prev_date -= timedelta(days=1)
+            sub.end_date = prev_date.strftime("%Y-%m-%d")
+
         attendance[date] = status
         sub.attendance = attendance
 
@@ -88,7 +99,7 @@ class DeleteSubView(APIView):
     authentication_classes = [TelegramAuthentication]
     def delete(self, request, sub_id):
         sub = Subscription.objects.get(id=sub_id)
-        deleted_notification(sub.id)
+        deleted_notification.delay(sub.id)
         return Response({"detail":"Subscription deleted"})
 
     

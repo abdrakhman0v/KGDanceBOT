@@ -430,9 +430,10 @@ class DetailGroupUser:
                         f"<b>Ф.И.О: {sub['last_name']} {sub['first_name']}</b>\n"
                         f"<b>Группа: {sub['group_title']} {sub['group_time'][:5]}</b>\n"
                         f"<b>Дата: {sub['start_date']}</b> — <b>{sub['end_date']}</b>\n"
+                        f"<b>Оплачено: {sub['price']} сом</b>\n"
                         f"<i>Посещено:</i> {sub['used_lessons']} из {sub['total_lessons']} занятий\n"
                         f"🗓 Даты занятий:\n")
-                        attendance = sub['attendance'] 
+                        attendance = sub['attendance']
 
                         for day in sub['lesson_dates']:
                             mark = ''
@@ -534,10 +535,13 @@ class DetailGroupUser:
 
         response = requests.patch(f"http://127.0.0.1:8000/subscription/mark_attendance/{sub_id}/", json=data, headers={'X-Telegram-Id':str(call.from_user.id)})
         sub_data = response.json()
-        if len(sub_data['']) == sub_data['total_lessons']:
-            self.bot.answer_callback_query(call.id, 'Абонемент закончился.', show_alert=True)
-
-        self.bot.answer_callback_query(call.id, 'Отмечено')
+        if response.status_code == 200:
+            not_cancel_days = sum(1 for m in sub_data['attendance'].values() if m != 'cancel')
+            if not_cancel_days == sub_data['total_lessons']:
+                self.bot.answer_callback_query(call.id, 'Абонемент закончился.', show_alert=True)
+            self.bot.answer_callback_query(call.id, 'Отмечено')
+        elif response.status_code == 400:
+            self.bot.answer_callback_query(call.id, 'Этот день уже отменен')
 
 
 
