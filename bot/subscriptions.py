@@ -251,10 +251,12 @@ class SubscriptionHandler:
                         
                         mark = ''
                         if day in attendance:
-                            if attendance[day] == True:
+                            if attendance[day] == 1:
                                 mark = '✅'
-                            else:
+                            elif attendance[day] == 0:
                                 mark = '❌'
+                            else:
+                                mark = 'Отмена'
 
                         text += f" • {day.replace('-', '.')} {mark}\n"
                     text += "────────────────────\n\n"
@@ -305,10 +307,12 @@ class SubscriptionHandler:
                         
                         mark = ''
                         if day in attendance:
-                            if attendance[day] == True:
+                            if attendance[day] == 1:
                                 mark = '✅'
-                            else:
+                            elif attendance[day] == 0:
                                 mark = '❌'
+                            else:
+                                mark = 'Отмена'
                         
                         text += f" • {day.replace('-', '.')} {mark}\n"
                     text += "────────────────────\n\n"

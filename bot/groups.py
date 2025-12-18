@@ -8,11 +8,16 @@ class CreateGroup:
     def __init__(self, bot):
         self.bot = bot
         self.group_data = {}
-        self.bot.callback_query_handler(func=lambda call:call.data in ['mon/wed/fri', 'tue/thu/sat', 'sat/sun'])(self.choose_day)
+        self.bot.message_handler(func=lambda m:m.chat.id in self.group_data)(self.create_group_fsm)
+        self.bot.callback_query_handler(func=lambda call:
+                                        (call.message.chat.id in self.group_data and 
+                                         self.group_data[call.message.chat.id]['step']=='days' and 
+                                         call.data in ['mon/wed/fri', 'tue/thu/sat', 'sat/sun'])
+                                        )(self.choose_day)
         self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_create_group')(self.cancel_create)
 
     def cancel_create(self, call):
-        self.group_data.pop(call.message.chat.id)
+        self.group_data.pop(call.message.chat.id, None)
         self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
         self.bot.send_message(call.message.chat.id, '❌ Создание группы отменено.')
 
@@ -25,62 +30,67 @@ class CreateGroup:
         if call.message.chat.id in self.group_data:
             self.bot.answer_callback_query(call.id, "⏳ Вы уже начали создание.")
             return
-        self.group_data[call.message.chat.id] = {}
+        
+        self.group_data[call.message.chat.id] = {'step':'title'}
 
         self.bot.send_message(call.message.chat.id, 'Введите название группы: ', reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler(call.message, self.get_title)
 
-    def get_title(self, message):
-        title = message.text.strip()
-        self.group_data[message.chat.id]['title'] = title
+    def create_group_fsm(self, message):
+        chat_id = message.chat.id
+        data = self.group_data[chat_id]
+        step = data['step']
 
-        self.bot.send_message(message.chat.id, 'Введите время группы: ')
-        self.bot.register_next_step_handler(message, self.get_time)
-    
-    def get_time(self, message):
-        time_str = message.text.strip()
+        if step == 'title':
+            title = message.text.strip()
+            data['title'] = title
+            data['step'] = 'time'
+
+            self.bot.send_message(chat_id, "Введите время группы (ЧЧ:ММ):", reply_markup=self.cancel_markup())
+
+        elif step == 'time':
+            time_str = message.text.strip()
         
-        try:
-            datetime.strptime(time_str, "%H:%M")  
-        except ValueError:
-            self.bot.send_message(message.chat.id, "❌ Неверный формат времени. Введите в формате ЧЧ:ММ (например, 18:30).")
-            self.bot.register_next_step_handler(message, self.get_time)
-            return
+            try:
+                datetime.strptime(time_str, "%H:%M")  
+            except ValueError:
+                self.bot.send_message(message.chat.id, "❌ Неверный формат времени. Введите в формате ЧЧ:ММ (например, 18:30).")
+                self.bot.register_next_step_handler(message, self.get_time)
+                return
+            
+            data['time'] = time_str
+            data['step'] = 'teacher'
+            self.bot.send_message(message.chat.id, 'Введите имя хореографа/тренера: ', reply_markup=self.cancel_markup())
 
-        self.group_data[message.chat.id]['time'] = time_str
+        elif step == 'teacher':
+            teacher = message.text.strip()
+            data['teacher'] = teacher
+            data['step'] = 'age'
+            self.bot.send_message(message.chat.id, 'Введите категорию возраста для группы: ', reply_markup=self.cancel_markup())
 
-        self.bot.send_message(message.chat.id, 'Введите имя хореографа/тренера: ', reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler(message, self.get_teacher)
+        elif step == 'age':
+            age = message.text.strip()
+            data['age'] = age
+            data['step'] = 'days'
 
-    def get_teacher(self, message):
-        teacher = message.text.strip()
-        self.group_data[message.chat.id]['teacher'] = teacher
-
-        self.bot.send_message(message.chat.id, 'Введите категорию возраста для группы: ', reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler(message, self.get_age)
-
-    def get_age(self, message):
-        age = message.text.strip()
-        self.group_data[message.chat.id]['age'] = age
-
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('пн/ср/пт', callback_data='mon/wed/fri'))
-        markup.add(types.InlineKeyboardButton('вт/чт/сб', callback_data='tue/thu/sat'))
-        markup.add(types.InlineKeyboardButton('сб/вс', callback_data='sat/sun'))
-        markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_group'))
-        self.bot.send_message(message.chat.id, 'Выберите дни: ', reply_markup=markup)
-
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton('пн/ср/пт', callback_data='mon/wed/fri'))
+            markup.add(types.InlineKeyboardButton('вт/чт/сб', callback_data='tue/thu/sat'))
+            markup.add(types.InlineKeyboardButton('сб/вс', callback_data='sat/sun'))
+            markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_create_group'))
+            self.bot.send_message(message.chat.id, 'Выберите дни: ', reply_markup=markup)
 
     def choose_day(self, call):
+        chat_id = call.message.chat.id
         telegram_id = call.from_user.id
         days = call.data
+        self.group_data[chat_id]['days'] = days
 
         data = {
-            'title':self.group_data[call.message.chat.id]['title'],
-            'time':self.group_data[call.message.chat.id]['time'],
-            'teacher':self.group_data[call.message.chat.id]['teacher'],
-            'age':self.group_data[call.message.chat.id]['age'],
-            'days':days
+            'title':self.group_data[chat_id]['title'],
+            'time':self.group_data[chat_id]['time'],
+            'teacher':self.group_data[chat_id]['teacher'],
+            'age':self.group_data[chat_id]['age'],
+            'days':self.group_data[chat_id]['days']
         }
         show_days = {'mon/wed/fri':'Пн-Ср-Пт','tue/thu/sat':'Вт-Чт-Сб','sat/sun':'Сб-Вс'}.get(days)
         try:
