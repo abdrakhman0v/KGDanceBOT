@@ -56,6 +56,14 @@ class SubscriptionHandler:
                                                        callback=lambda message: self.get_price(message))
         
     def get_price(self, message):
+        if not message.text.isdigit():
+            self.bot.send_message(message.chat.id, "❌ Введите число.")
+            self.bot.register_next_step_handler_by_chat_id(
+                message.chat.id,
+                lambda msg: self.get_price(msg)
+            )
+            return
+    
         price = int(message.text.strip())
         
         self.sub_data[message.chat.id]['price'] = price
@@ -138,13 +146,13 @@ class SubscriptionHandler:
                         f"💰 Сумма: {sub['price']} сом\n"
                         f"🏷 Кол-во занятий: {self.sub_data[chat_id]['total_lessons']}")
 
-                        from bot.main import list_group_handler
-                        if sub['group_days'] == 'mon/wed/fri':
-                            list_group_handler.groups_list_mon(chat_id, telegram_id, call.message.message_id)
-                        elif sub['group_days'] == 'tue/thu/sat':
-                            list_group_handler.groups_list_tue(chat_id, telegram_id, call.message.message_id)
-                        elif sub['group_days'] == 'sat/sun':
-                            list_group_handler.groups_list_sun(chat_id, telegram_id, call.message.message_id)
+                        from bot.main import detail_user_handler
+                        detail_user_handler.render_user_sub(chat_id,
+                                                      call.message.message_id,
+                                                      self.sub_data[chat_id]['telegram_id'],
+                                                      self.sub_data[chat_id]['group_id'],
+                                                      call.from_user.id)
+                        
                     else:
                         self.bot.send_message(call.message.chat.id, f'Ошибка при создании: {response.status_code} {response.text}')
 
@@ -203,8 +211,8 @@ class SubscriptionHandler:
 
         markup = types.InlineKeyboardMarkup()
         markup.row(
-            types.InlineKeyboardButton('Подтвердить', callback_data=f'delete_sub_{sub_id}'),
-            types.InlineKeyboardButton('⬅️ Назад', callback_data=f'group_user_{telegram_id}_{group_id}')
+            types.InlineKeyboardButton('Подтвердить', callback_data=f'delete_sub_{sub_id}_{telegram_id}_{group_id}'),
+            types.InlineKeyboardButton('Отмена', callback_data=f'group_user_{telegram_id}_{group_id}')
             )
         self.bot.edit_message_text(text='Вы уверены, что хотите удалить абонемент?',
             chat_id=call.message.chat.id,
@@ -213,9 +221,21 @@ class SubscriptionHandler:
                                    )
         
     def delete_sub(self,call):
+        chat_id=call.message.chat.id
         sub_id = call.data.split('_')[2]
+        telegram_id = call.data.split('_')[3]
+        group_id = call.data.split('_')[4]
+
         response=requests.delete(f"{API_URL}delete_sub/{sub_id}/", headers={'X-Telegram-Id':str(call.from_user.id)}) 
         self.bot.answer_callback_query(call.id, 'Абонемент удален')
+        import time
+        time.sleep(1)
+        from bot.main import detail_user_handler
+        detail_user_handler.render_user_sub(chat_id,
+                                        call.message.message_id,
+                                        telegram_id,
+                                        group_id,
+                                        call.from_user.id)
 
     def show_my_subscriptions(self,call):
         telegram_id = call.from_user.id

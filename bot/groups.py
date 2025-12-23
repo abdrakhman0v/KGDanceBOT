@@ -58,18 +58,18 @@ class CreateGroup:
                 return
             
             data['time'] = time_str
+            data['step'] = 'age'
+            self.bot.send_message(message.chat.id, 'Введите возрастную категорию группы: ', reply_markup=self.cancel_markup())
+
+        elif step == 'age':
+            age = message.text.strip()
+            data['age'] = age
             data['step'] = 'teacher'
             self.bot.send_message(message.chat.id, 'Введите имя хореографа/тренера: ', reply_markup=self.cancel_markup())
 
         elif step == 'teacher':
             teacher = message.text.strip()
             data['teacher'] = teacher
-            data['step'] = 'age'
-            self.bot.send_message(message.chat.id, 'Введите категорию возраста для группы: ', reply_markup=self.cancel_markup())
-
-        elif step == 'age':
-            age = message.text.strip()
-            data['age'] = age
             data['step'] = 'days'
 
             markup = types.InlineKeyboardMarkup()
@@ -305,7 +305,7 @@ class DetailGroup:
 
         phone = message.text.strip()
 
-        if phone.startswith('9'):
+        if phone.startswith('996'):
             phone = '+' + phone 
         if not phone or not phone.startswith("+") or not phone[1:].isdigit():
             self.waiting_phone.add(message.chat.id)
@@ -428,15 +428,26 @@ class DetailGroupUser:
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('confirm_delete_user_'))(self.delete_user)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('set_attendance_'))(self.set_attendance)
     
-
-    def get_user_subs(self, call):  
-        telegram_id = call.data.split('_')[2]
-        group_id = call.data.split('_')[3]       
-        chat_id = call.message.chat.id
-        message_id = call.message.message_id
-
+    def safe_edit(self, chat_id, message_id, text, reply_markup=None):
         try:
-            response = requests.get(f"http://127.0.0.1:8000/subscription/get_user_sub/{telegram_id}/", headers={'X-Telegram-Id':str(call.from_user.id)})
+            self.bot.edit_message_text(
+                text=text,
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+        except Exception:
+            self.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+
+    def render_user_sub(self, chat_id, message_id, telegram_id, group_id, admin_id):  
+        try:
+            response = requests.get(f"http://127.0.0.1:8000/subscription/get_user_sub/{telegram_id}/", headers={'X-Telegram-Id':str(admin_id)})
             if response.status_code == 200:
                 subscriptions = response.json()
 
@@ -445,12 +456,7 @@ class DetailGroupUser:
                      markup.add(types.InlineKeyboardButton('+ Создать абонемент', callback_data=f'create_sub_{telegram_id}_{group_id}'))
                      markup.add(types.InlineKeyboardButton('Удалить из группы', callback_data=f'delete_from_group_{telegram_id}_{group_id}'))
                      markup.add(types.InlineKeyboardButton('⬅️Назад', callback_data=f'users_list_{group_id}'))
-                     self.bot.edit_message_text(
-                      '🤷🏻‍♂️ У этого клиента нет активных абонементов',
-                      chat_id=chat_id,
-                      message_id=message_id,
-                      reply_markup=markup
-                    )
+                     self.safe_edit(chat_id, message_id, '🤷🏻‍♂️ У этого клиента нет активных абонементов', markup)
                      return
                 
                 active_text = "<b>Активные абонементы:</b>\n\n"
@@ -479,11 +485,7 @@ class DetailGroupUser:
                             markup.add(types.InlineKeyboardButton(f'📅 {day.replace('-', '.')[:5]} {mark}', callback_data=f'mark_attendance_{sub['id']}_{day}_{telegram_id}_{group_id}'))
                         markup.add(types.InlineKeyboardButton('Удалить абонемент', callback_data=f'confirm_delete_sub_{sub['id']}_{telegram_id}_{group_id}'))
                         markup.add(types.InlineKeyboardButton('⬅️ Назад', callback_data=f'users_list_{group_id}'))
-                        self.bot.edit_message_text(text=active_text,
-                                           chat_id=chat_id,
-                                           message_id=message_id,
-                                           reply_markup=markup,
-                                           parse_mode='HTML')
+                        self.safe_edit(chat_id, message_id,active_text,markup)
                         break
 
                     # elif sub['group'] == int(group_id) and sub['is_active'] == False:
@@ -518,17 +520,24 @@ class DetailGroupUser:
                     markup.add(types.InlineKeyboardButton('+ Создать абонемент', callback_data=f'create_sub_{telegram_id}_{group_id}'))
                     markup.add(types.InlineKeyboardButton('Удалить из группы', callback_data=f'delete_from_group_{telegram_id}_{group_id}'))
                     markup.add(types.InlineKeyboardButton('⬅️Назад', callback_data=f'users_list_{group_id}'))
-                    self.bot.edit_message_text(
-                    '🤷🏻‍♂️ У этого клиента нет активных абонементов',
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    reply_markup=markup
-                    )
+                    self.safe_edit(chat_id, message_id, '🤷🏻‍♂️ У этого клиента нет активных абонементов', markup)
             else:
-                 self.bot.send_message(call.message.chat.id, f'Ошибка response: {response.status_code} {response.text}')
+                 self.bot.send_message(chat_id, f'Ошибка response: {response.status_code} {response.text}')
         except Exception as e:
-            self.bot.send_message(call.message.chat.id, f'Ошибка: {e}')
+            self.bot.send_message(chat_id, f'Ошибка: {e}')
 
+
+    def get_user_sub(self, call):
+        telegram_id = call.data.split('_')[2]
+        group_id = call.data.split('_')[3]
+
+        self.render_user_sub(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            telegram_id=telegram_id,
+            group_id=group_id,
+            admin_id=call.from_user.id
+        )   
 
     def mark_attendance(self, call):
         sub_id = call.data.split('_')[2]

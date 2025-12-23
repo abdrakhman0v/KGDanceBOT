@@ -77,7 +77,7 @@ class Auth:
         else:
             phone = message.text.strip()
 
-        if phone.startswith('9'):
+        if phone.startswith('996'):
             phone = '+' + phone 
         if not phone or not phone.startswith("+") or not phone[1:].isdigit():
             self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ')
@@ -185,6 +185,7 @@ class MyProfile:
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('my_childs_profile_'))(self.show_my_childs)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('edit_profile_'))(self.edit_profile)
         self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_edit')(self.cancel_edit)
+        self.bot.message_handler(func=lambda m:m.chat.id in self.edit_data)(self.edit_profile_fsm)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('my_child_detail_'))(self.my_childs_detail)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('edit_childs_name_'))(self.edit_childs_name)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('confirm_delete_child_'))(self.confirm_delete_child)
@@ -229,60 +230,68 @@ class MyProfile:
             self.bot.answer_callback_query(call.id, '⏳ Вы уже начали редактирование.')
             return
         
-        user_id = call.data.strip('_')[-1]
+        user_id = call.data.split('_')[-1]
         self.edit_data[call.message.chat.id] = {'id':user_id}
+        self.edit_data[call.message.chat.id]['step'] = 'first_name'
 
         self.bot.send_message(call.message.chat.id, "Введите имя:", reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler(call.message, self.get_name)
 
-    def get_name(self, message):
-        first_name = message.text.strip()
-        self.edit_data[message.chat.id]['first_name'] = first_name
-        self.bot.send_message(message.chat.id, "Введите фаимилию:", reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler(message, self.get_last_name)
-
-    def get_last_name(self, message):
-        last_name = message.text.strip()
-        self.edit_data[message.chat.id]['last_name'] = last_name
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-        markup.add(types.KeyboardButton(text='📞 Отправить номер', request_contact=True))
-        self.bot.send_message(message.chat.id, 'Отправьте номер телефона(+996): ', reply_markup=markup)
-        self.bot.register_next_step_handler(message, self.get_phone)
-
-    def get_phone(self, message):
-        if message.contact:
-            phone = message.contact.phone_number
-        else:
-            phone = message.text.strip()
-
-        if phone.startswith('9'):
-            phone = '+' + phone 
-        if not phone or not phone.startswith("+") or not phone[1:].isdigit():
-            self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ')
-            self.bot.register_next_step_handler(message, self.get_phone)
+    def edit_profile_fsm(self, message):
+        chat_id = message.chat.id
+        if chat_id not in self.edit_data:
             return
+        data = self.edit_data[chat_id]
+        step = data['step']
+
+        if step == 'first_name':
+            first_name = message.text.strip()
+            data['first_name'] = first_name
+            data['step'] = 'last_name'
+            self.bot.send_message(message.chat.id, "Введите фамилию:", reply_markup=self.cancel_markup())
+
+        elif step == 'last_name':
+            last_name = message.text.strip()
+            data['last_name'] = last_name
+            data['step'] = 'phone'
+            markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+            markup.add(types.KeyboardButton(text='📞 Отправить номер', request_contact=True))
+            self.bot.send_message(message.chat.id, 'Отправьте номер телефона(+996): ', reply_markup=markup)
+        
+        elif step == 'phone':
+
+            if message.contact:
+                phone = message.contact.phone_number
+            else:
+                phone = message.text.strip()
+
+            if phone.startswith('996'):
+                phone = '+' + phone 
+            if not phone or not phone.startswith("+") or not phone[1:].isdigit():
+                self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ', reply_markup=self.cancel_edit())
+                return
     
-        self.edit_data[message.chat.id]['phone'] = phone
+            data['phone'] = phone
 
-        self.bot.send_message(
-        message.chat.id,
-        "Обновляю данные...",
-        reply_markup=types.ReplyKeyboardRemove()
-    )
+            self.bot.send_message(
+            message.chat.id,
+            "Обновляю данные...",
+            reply_markup=types.ReplyKeyboardRemove()
+            )
 
-        data = {
-            'id':self.edit_data[message.chat.id]['id'],
-            'first_name':self.edit_data[message.chat.id]['first_name'],
-            'last_name':self.edit_data[message.chat.id]['last_name'],
-            'phone':self.edit_data[message.chat.id]['phone'],
-        }
-        response = requests.patch(f"{API_URL}update_user/", json=data, headers={"X-Telegram-Id":str(message.from_user.id)})
-        if response.status_code == 200:
-            self.bot.send_message(message.chat.id, "✅ Профиль успешно обновлен!")
-            self.bot.send_message(message.chat.id, "/menu")
-            self.edit_data.pop(message.chat.id)
-        else:
-            self.bot.send_message(message.chat.id, f"Ошибка при обновлении: {response.status_code} {response.text}")
+            payload = {
+                'id':data['id'],
+                'first_name':data['first_name'],
+                'last_name':data['last_name'],
+                'phone':data['phone'],
+            }
+            response = requests.patch(f"{API_URL}update_user/", json=payload, headers={"X-Telegram-Id":str(message.from_user.id)})
+            if response.status_code == 200:
+                self.bot.send_message(message.chat.id, "✅ Профиль успешно обновлен!")
+                self.bot.send_message(message.chat.id, "/menu")
+                self.edit_data.pop(message.chat.id)
+            else:
+                self.bot.send_message(message.chat.id, f"Ошибка при обновлении: {response.status_code} {response.text}")
+                self.edit_data.pop(message.chat.id)
             
 
     def show_my_childs(self, call):

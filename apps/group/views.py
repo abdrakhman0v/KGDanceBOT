@@ -19,6 +19,7 @@ class GroupCreateView(generics.CreateAPIView):
 
 class GroupListView(APIView):
     authentication_classes = [TelegramAuthentication]
+    permission_classes = [IsAdmin]
 
     def get(self, request):
         days = request.query_params.get('days')

@@ -207,7 +207,7 @@ def start_detail(call):
 detail_user_handler = DetailGroupUser(bot)
 @bot.callback_query_handler(func=lambda call:call.data.startswith('group_user_'))
 def start_detail_user(call):
-    detail_user_handler.get_user_subs(call)
+    detail_user_handler.get_user_sub(call)
 
 update_group_handler = UpdateGroup(bot)
 @bot.callback_query_handler(func=lambda call:call.data.startswith('edit_'))
