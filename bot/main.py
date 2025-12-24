@@ -31,7 +31,7 @@ def register_child_handler(call):
 my_profile_handler = MyProfile(bot)
 @bot.callback_query_handler(func=lambda call:call.data == 'my_profile')
 def profile_handler(call):
-    my_profile_handler.show_my_profile(call)
+    my_profile_handler.start_profile(call)
 
 
 # ----------ГЛАВНОЕ МЕНЮ-----------

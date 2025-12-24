@@ -185,16 +185,23 @@ class MyProfile:
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('my_childs_profile_'))(self.show_my_childs)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('edit_profile_'))(self.edit_profile)
         self.bot.callback_query_handler(func=lambda call:call.data == 'cancel_edit')(self.cancel_edit)
-        self.bot.message_handler(func=lambda m:m.chat.id in self.edit_data)(self.edit_profile_fsm)
+        self.bot.message_handler(
+            content_types=['text', 'contact'],
+            func=lambda m:m.chat.id in self.edit_data)(self.edit_profile_fsm)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('my_child_detail_'))(self.my_childs_detail)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('edit_childs_name_'))(self.edit_childs_name)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('confirm_delete_child_'))(self.confirm_delete_child)
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('delete_child_'))(self.delete_child)
 
-    def show_my_profile(self, call):
+    def start_profile(self, call):
+        self.show_my_profile(call.message.chat.id,
+                             call.message.message_id,
+                             call.from_user.id)
+
+    def show_my_profile(self, chat_id, message_id, telegram_id):
         response = requests.get(f"{API_URL}get_users_data/",
-                                params={'telegram_id':call.from_user.id},
-                                headers={"X-Telegram-Id":str(call.from_user.id)})
+                                params={'telegram_id':telegram_id},
+                                headers={"X-Telegram-Id":str(telegram_id)})
         user = response.json()
         role = user['role']
         show_role = {'parent':'Родитель', 'admin':'Администратор', 'student':'Ученик'}.get(role, role)
@@ -210,11 +217,14 @@ class MyProfile:
             f"<b>Номер:</b> {user['phone']}\n"
             f"<b>Роль:</b> {show_role}\n"
         )
-        self.bot.edit_message_text(text=text,
-                                   chat_id=call.message.chat.id,
-                                   message_id=call.message.message_id,
+        try:
+            self.bot.edit_message_text(text=text,
+                                   chat_id=chat_id,
+                                   message_id=message_id,
                                    parse_mode="HTML",
                                    reply_markup=markup)
+        except Exception:
+            self.bot.send_message(chat_id, text, parse_mode="HTML",reply_markup=markup)
         
     def cancel_edit(self, call):
         self.edit_data.pop(call.message.chat.id, None)
@@ -260,7 +270,6 @@ class MyProfile:
             self.bot.send_message(message.chat.id, 'Отправьте номер телефона(+996): ', reply_markup=markup)
         
         elif step == 'phone':
-
             if message.contact:
                 phone = message.contact.phone_number
             else:
@@ -269,11 +278,10 @@ class MyProfile:
             if phone.startswith('996'):
                 phone = '+' + phone 
             if not phone or not phone.startswith("+") or not phone[1:].isdigit():
-                self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ', reply_markup=self.cancel_edit())
+                self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ')
                 return
-    
-            data['phone'] = phone
 
+            data['phone'] = phone
             self.bot.send_message(
             message.chat.id,
             "Обновляю данные...",
@@ -289,7 +297,8 @@ class MyProfile:
             response = requests.patch(f"{API_URL}update_user/", json=payload, headers={"X-Telegram-Id":str(message.from_user.id)})
             if response.status_code == 200:
                 self.bot.send_message(message.chat.id, "✅ Профиль успешно обновлен!")
-                self.bot.send_message(message.chat.id, "/menu")
+                from .main import my_profile_handler
+                my_profile_handler.show_my_profile(chat_id, message.message_id, message.from_user.id)
                 self.edit_data.pop(message.chat.id)
             else:
                 self.bot.send_message(message.chat.id, f"Ошибка при обновлении: {response.status_code} {response.text}")
@@ -386,12 +395,3 @@ class MyProfile:
             self.bot.send_message(chat_id, '❌ Невозможно удалить ребенка, у него есть активные абонементы.')
         else:
             self.bot.send_message(chat_id, f"Ошибка при удалении: {response.status_code} {response.text}")
-
-
-
-
-        
-
-        
-
-
