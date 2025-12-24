@@ -53,7 +53,7 @@ def check_subscription_expiry(sub_id, date, status):
         else:
             text = (f"<b>Группа: {sub.group.title} {time_str}\n</b>"
                     f"<b>Ребенок: {sub.user.last_name} {sub.user.first_name}\n</b>"
-                    f"❗️Занятие отменено. Дата: {date}"
+                    f"❗️Занятие отменено. Дата: {date}\n"
                     f"Добавлена новая дата занятия {sub.end_date.strftime('%d-%m-%Y')}")
             bot.send_message(sub.user.parent.telegram_id, text, parse_mode="HTML")
         

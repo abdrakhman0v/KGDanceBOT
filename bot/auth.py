@@ -192,7 +192,9 @@ class MyProfile:
         self.bot.callback_query_handler(func=lambda call:call.data.startswith('delete_child_'))(self.delete_child)
 
     def show_my_profile(self, call):
-        response = requests.get(f"{API_URL}get_users_data/", headers={"X-Telegram-Id":str(call.from_user.id)})
+        response = requests.get(f"{API_URL}get_users_data/",
+                                params={'telegram_id':call.from_user.id},
+                                headers={"X-Telegram-Id":str(call.from_user.id)})
         user = response.json()
         role = user['role']
         show_role = {'parent':'Родитель', 'admin':'Администратор', 'student':'Ученик'}.get(role, role)

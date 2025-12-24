@@ -274,43 +274,46 @@ class DetailGroup:
         markup.add(types.InlineKeyboardButton('❌ Отменить', callback_data='cancel_add_client'))
         return markup
     
-    def find_user(self, call):
-        if call.message.chat.id in self.waiting_phone:
-            self.bot.answer_callback_query(call.id, '⏳ Вы уже начали поиск.')
-            return
-        
-        self.user_to_add[call.message.chat.id] = {}
-        self.waiting_phone.add(call.message.chat.id)
-        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона клиента(+996): ', reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, 
+    def start_phone_input(self, chat_id):
+        self.waiting_phone.discard(chat_id)
+        self.waiting_phone.add(chat_id)
+        self.bot.send_message(chat_id, '📞 Введите номер телефона клиента(+996): ', reply_markup=self.cancel_markup())
+        self.bot.register_next_step_handler_by_chat_id(chat_id, 
                                                        callback=lambda message: self.get_phone(message)
                                                        )
 
-    def retry_phone(self, call):
-        if call.message.chat.id in self.waiting_phone:
+    def find_user(self, call):
+        chat_id = call.message.chat.id
+        if chat_id in self.waiting_phone:
             self.bot.answer_callback_query(call.id, '⏳ Вы уже начали поиск.')
             return
         
-        self.waiting_phone.add(call.message.chat.id) 
-        self.bot.send_message(call.message.chat.id, '📞 Введите номер телефона клиента(+996): ', reply_markup=self.cancel_markup())
-        self.bot.register_next_step_handler_by_chat_id(call.message.chat.id, 
-                                                       callback=lambda message: self.get_phone(message)
-                                                       )
+        self.user_to_add[chat_id] = {}
+        self.start_phone_input(chat_id)
         
-    def get_phone(self, message):
-        if message.chat.id not in self.waiting_phone:
+
+    def retry_phone(self, call):
+        chat_id = call.message.chat.id
+        if chat_id in self.waiting_phone:
+            self.bot.answer_callback_query(call.id, '⏳ Вы уже начали поиск.')
             return
         
-        self.waiting_phone.discard(message.chat.id)
+        self.start_phone_input(chat_id)
+        
+    def get_phone(self, message):
+        chat_id = message.chat.id
+        if chat_id not in self.waiting_phone:
+            return
+        
+        self.waiting_phone.discard(chat_id)
 
         phone = message.text.strip()
 
         if phone.startswith('996'):
             phone = '+' + phone 
         if not phone or not phone.startswith("+") or not phone[1:].isdigit():
-            self.waiting_phone.add(message.chat.id)
-            self.bot.send_message(message.chat.id, f'Неверный формат номера ({phone}). Попробуйте ещё раз: ')
-            self.bot.register_next_step_handler(message, lambda msg: self.get_phone(msg))
+            self.bot.send_message(chat_id, f'Неверный формат номера ({phone}). Попробуйте ещё раз.')
+            self.start_phone_input(chat_id)
             return
         
         response = requests.get(f'http://127.0.0.1:8000/account/get_user_by_phone/', headers={'X-Telegram-Id':str(message.from_user.id)} ,params={'phone':phone})
@@ -379,8 +382,8 @@ class DetailGroup:
                 
                 
             elif response.status_code == 404:
-                self.bot.send_message(message.chat.id, '🤷🏻‍♂️ Пользователя с таким номером не существует. Попробуйте снова:')
-                self.bot.register_next_step_handler(message, lambda msg: self.get_phone(msg))
+                self.bot.send_message(chat_id, '🤷🏻‍♂️ Пользователя с таким номером не существует. Попробуйте снова.')
+                self.start_phone_input(chat_id)
 
             else:
                 self.bot.send_message(message.chat.id, f'Ошибка при поиске клиента: {response.status_code} {response.text}')
@@ -399,13 +402,15 @@ class DetailGroup:
             response = requests.patch(f"{API_URL}add_user/", json=data, headers={'X-Telegram-Id':str(telegram_id)})
             if response.status_code == 200:
                 r_data = response.json()
-                self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)           
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton(f"{r_data['last_name']} {r_data['first_name']}",
-                                                       callback_data=f"group_user_{r_data['telegram_id']}_{r_data['group_id']}"))
+                self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)  
+                from bot.main import detail_user_handler
+                detail_user_handler.render_user_sub(chat_id,
+                                                    call.message.message_id,
+                                                    r_data['telegram_id'],
+                                                    r_data['group_id'],
+                                                    call.from_user.id)          
                 self.bot.send_message(chat_id, 
-                                      f'✅ Добавлен новый пользователь  в группу "{r_data["group_title"]} {r_data["group_time"][:5]}"',
-                                      reply_markup=markup)
+                                      f'✅ Добавлен новый пользователь  в группу "{r_data["group_title"]} {r_data["group_time"][:5]}"')
             elif response.status_code == 400:
                 r_data=response.json()
                 self.bot.send_message(chat_id,
@@ -448,15 +453,20 @@ class DetailGroupUser:
     def render_user_sub(self, chat_id, message_id, telegram_id, group_id, admin_id):  
         try:
             response = requests.get(f"http://127.0.0.1:8000/subscription/get_user_sub/{telegram_id}/", headers={'X-Telegram-Id':str(admin_id)})
+            users_response=requests.get("http://127.0.0.1:8000/account/get_users_data",
+                                            params={"telegram_id":telegram_id}, 
+                                            headers={"X-Telegram-Id":str(admin_id)})
+            u_data = users_response.json()
             if response.status_code == 200:
                 subscriptions = response.json()
 
                 markup = types.InlineKeyboardMarkup()
                 if not subscriptions:
+                     
                      markup.add(types.InlineKeyboardButton('+ Создать абонемент', callback_data=f'create_sub_{telegram_id}_{group_id}'))
                      markup.add(types.InlineKeyboardButton('Удалить из группы', callback_data=f'delete_from_group_{telegram_id}_{group_id}'))
                      markup.add(types.InlineKeyboardButton('⬅️Назад', callback_data=f'users_list_{group_id}'))
-                     self.safe_edit(chat_id, message_id, '🤷🏻‍♂️ У этого клиента нет активных абонементов', markup)
+                     self.safe_edit(chat_id, message_id, f"🤷🏻‍♂️ У {u_data['last_name']} {u_data['first_name']} нет активных абонементов", markup)
                      return
                 
                 active_text = "<b>Активные абонементы:</b>\n\n"
@@ -520,7 +530,7 @@ class DetailGroupUser:
                     markup.add(types.InlineKeyboardButton('+ Создать абонемент', callback_data=f'create_sub_{telegram_id}_{group_id}'))
                     markup.add(types.InlineKeyboardButton('Удалить из группы', callback_data=f'delete_from_group_{telegram_id}_{group_id}'))
                     markup.add(types.InlineKeyboardButton('⬅️Назад', callback_data=f'users_list_{group_id}'))
-                    self.safe_edit(chat_id, message_id, '🤷🏻‍♂️ У этого клиента нет активных абонементов', markup)
+                    self.safe_edit(chat_id, message_id, f"🤷🏻‍♂️ У {u_data['last_name']} {u_data['first_name']} нет активных абонементов", markup)
             else:
                  self.bot.send_message(chat_id, f'Ошибка response: {response.status_code} {response.text}')
         except Exception as e:

@@ -86,7 +86,7 @@ class GetUsersDataView(APIView):
     authentication_classes = [TelegramAuthentication]
 
     def get(self, request):
-        tg_id = request.headers.get('X-Telegram-Id')
+        tg_id = request.query_params.get('telegram_id')
         user = User.objects.get(telegram_id=tg_id)
         serializer = UserSerializer(user)
         return Response(serializer.data)
